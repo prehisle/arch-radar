@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+gunicorn
+sqlmodel
+pydantic
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+pymysql
+pytest
+httpx
+python-dotenv
+redis
+requests
+openai
+reportlab
