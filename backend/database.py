@@ -1,9 +1,10 @@
 from sqlmodel import SQLModel, create_engine, Session, select
 from backend.config import settings
 import redis
+import pymysql  # Explicitly import pymysql for SQLAlchemy MySQL driver
 
 # MySQL connection
-# Ensure pymysql is installed
+# Ensure pymysql is installed and available as MySQL driver
 engine = create_engine(settings.DATABASE_URL, echo=False, pool_pre_ping=True)
 
 # Redis connection

@@ -5,6 +5,7 @@
 # --- Exceptions (Keep these) ---
 !.gitignore
 !.env
+!.dockerignore
 !*.md
 !.env.example
 !.env.docker.example
@@ -14,6 +15,10 @@
 !/docs/
 !/scripts/
 !/data/
+!/.github/
+!/docker/
+!/sealos/
+!/docker-compose.yml
 
 # --- Specific Folder Rules ---
 

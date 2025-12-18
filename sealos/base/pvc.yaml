@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: arch-radar-images-pvc
+  labels:
+    app: arch-radar
+spec:
+  accessModes:
+    - ReadWriteMany  # 多个 Pod 可以同时读写（用于多副本部署）
+  resources:
+    requests:
+      storage: 5Gi  # 静态图片资源约 2.7MB，预留 5Gi 空间用于未来扩展
+  storageClassName: "" # 使用 Sealos 默认的 StorageClass，或指定特定的存储类

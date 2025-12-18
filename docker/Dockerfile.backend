@@ -1,0 +1,38 @@
+# Stage 1: Builder
+FROM python:3.11-slim as builder
+WORKDIR /app
+COPY backend/requirements-prod.txt requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Stage 2: Production
+FROM python:3.11-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-wqy-zenhei \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 1000 -s /bin/bash appuser
+
+WORKDIR /app
+COPY --from=builder /root/.local /home/appuser/.local
+COPY backend/ /app/backend/
+COPY ziliao/images/ /app/ziliao/images/
+
+ENV PATH=/home/appuser/.local/bin:$PATH
+ENV PYTHONPATH=/app
+
+RUN chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8000/api/dashboard/stats || exit 1
+
+CMD ["gunicorn", "backend.main:app", \
+     "--workers", "4", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]
