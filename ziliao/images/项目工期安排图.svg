@@ -1,0 +1,100 @@
+<svg viewBox="0 0 800 650" xmlns="http://www.w3.org/2000/svg">
+  <!-- 定义箭头 -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#000" />
+    </marker>
+  </defs>
+  
+  <!-- 标题 -->
+  <text x="400" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#000">
+    项目工期安排图（考虑人力资源约束）
+  </text>
+  
+  <!-- 坐标轴（带箭头） -->
+  <line x1="100" y1="580" x2="100" y2="60" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="100" y1="580" x2="720" y2="580" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Y轴标签 -->
+  <text x="70" y="50" text-anchor="middle" font-size="14" font-weight="bold" fill="#000">人数</text>
+  <text x="85" y="85" text-anchor="end" font-size="13" fill="#000">10</text>
+  <text x="85" y="135" text-anchor="end" font-size="13" fill="#000">9</text>
+  <text x="85" y="185" text-anchor="end" font-size="13" fill="#000">8</text>
+  <text x="85" y="235" text-anchor="end" font-size="13" fill="#000">7</text>
+  <text x="85" y="285" text-anchor="end" font-size="13" fill="#000">6</text>
+  <text x="85" y="335" text-anchor="end" font-size="13" fill="#000">5</text>
+  <text x="85" y="385" text-anchor="end" font-size="13" fill="#000">4</text>
+  <text x="85" y="435" text-anchor="end" font-size="13" fill="#000">3</text>
+  <text x="85" y="485" text-anchor="end" font-size="13" fill="#000">2</text>
+  <text x="85" y="535" text-anchor="end" font-size="13" fill="#000">1</text>
+  <text x="85" y="585" text-anchor="end" font-size="13" fill="#000">0</text>
+  
+  <!-- X轴标签 -->
+  <text x="735" y="595" text-anchor="start" font-size="14" fill="#000">时间(天)</text>
+  <text x="100" y="605" text-anchor="middle" font-size="13" fill="#000">1</text>
+  <text x="150" y="605" text-anchor="middle" font-size="13" fill="#000">2</text>
+  <text x="200" y="605" text-anchor="middle" font-size="13" fill="#000">3</text>
+  <text x="250" y="605" text-anchor="middle" font-size="13" fill="#000">4</text>
+  <text x="300" y="605" text-anchor="middle" font-size="13" fill="#000">5</text>
+  <text x="350" y="605" text-anchor="middle" font-size="13" fill="#000">6</text>
+  <text x="400" y="605" text-anchor="middle" font-size="13" fill="#000">7</text>
+  <text x="450" y="605" text-anchor="middle" font-size="13" fill="#000">8</text>
+  <text x="500" y="605" text-anchor="middle" font-size="13" fill="#000">9</text>
+  <text x="550" y="605" text-anchor="middle" font-size="13" fill="#000">10</text>
+  <text x="600" y="605" text-anchor="middle" font-size="13" fill="#000">11</text>
+  <text x="650" y="605" text-anchor="middle" font-size="13" fill="#000">12</text>
+  
+  <!-- 网格线 -->
+  <line x1="100" y1="130" x2="700" y2="130" stroke="#ddd" stroke-width="1"/>
+  <line x1="100" y1="180" x2="700" y2="180" stroke="#ddd" stroke-width="1"/>
+  <line x1="100" y1="230" x2="700" y2="230" stroke="#ddd" stroke-width="1"/>
+  <line x1="100" y1="280" x2="700" y2="280" stroke="#ddd" stroke-width="1"/>
+  <line x1="100" y1="330" x2="700" y2="330" stroke="#ddd" stroke-width="1"/>
+  <line x1="100" y1="380" x2="700" y2="380" stroke="#ddd" stroke-width="1"/>
+  <line x1="100" y1="430" x2="700" y2="430" stroke="#ddd" stroke-width="1"/>
+  <line x1="100" y1="480" x2="700" y2="480" stroke="#ddd" stroke-width="1"/>
+  <line x1="100" y1="530" x2="700" y2="530" stroke="#ddd" stroke-width="1"/>
+  
+  <!-- 第1-2天: C(4人) + D(6人) -->
+  <!-- C: 4人，从380到580 (高度200) -->
+  <rect x="100" y="380" width="100" height="200" fill="#aaa" stroke="#333" stroke-width="1"/>
+  <text x="150" y="470" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">C</text>
+  <text x="150" y="490" text-anchor="middle" font-size="13" fill="#fff">4人</text>
+  
+  <!-- D: 6人，从80到380 (高度300) -->
+  <rect x="100" y="80" width="100" height="300" fill="#555" stroke="#333" stroke-width="1"/>
+  <text x="150" y="220" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">D</text>
+  <text x="150" y="240" text-anchor="middle" font-size="13" fill="#fff">6人</text>
+  
+  <!-- 第2-4天: F(7人) + B(2人) -->
+  <!-- F: 7人，从230到580 (高度350) -->
+  <rect x="200" y="230" width="100" height="350" fill="#aaa" stroke="#333" stroke-width="1"/>
+  <text x="250" y="395" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">F</text>
+  <text x="250" y="415" text-anchor="middle" font-size="13" fill="#fff">7人</text>
+  
+  <!-- B: 2人，从130到230 (高度100) -->
+  <rect x="200" y="130" width="100" height="100" fill="#777" stroke="#333" stroke-width="1"/>
+  <text x="250" y="175" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">B</text>
+  <text x="250" y="195" text-anchor="middle" font-size="13" fill="#fff">2人</text>
+  
+  <!-- 第4-7天: G(2人) + E(6人) 【修正：G在下，E在上】 -->
+  <!-- G: 2人，从480到580 (高度100) -->
+  <rect x="300" y="480" width="150" height="100" fill="#777" stroke="#333" stroke-width="1"/>
+  <text x="375" y="525" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">G</text>
+  <text x="375" y="545" text-anchor="middle" font-size="13" fill="#fff">2人</text>
+  
+  <!-- E: 6人，从180到480 (高度300) -->
+  <rect x="300" y="180" width="150" height="300" fill="#aaa" stroke="#333" stroke-width="1"/>
+  <text x="375" y="320" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">E</text>
+  <text x="375" y="340" text-anchor="middle" font-size="13" fill="#fff">6人</text>
+  
+  <!-- 第7-11天: H(1人) + A(8人) 【修正：H在下，A在上】 -->
+  <!-- H: 1人，从530到580 (高度50) -->
+  <rect x="450" y="530" width="200" height="50" fill="#aaa" stroke="#333" stroke-width="1"/>
+  <text x="550" y="560" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">H 1人</text>
+  
+  <!-- A: 8人，从130到530 (高度400) -->
+  <rect x="450" y="130" width="200" height="400" fill="#555" stroke="#333" stroke-width="1"/>
+  <text x="550" y="320" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">A</text>
+  <text x="550" y="340" text-anchor="middle" font-size="13" fill="#fff">8人</text>
+</svg>

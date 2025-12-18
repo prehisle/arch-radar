@@ -1,0 +1,70 @@
+<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+  <!-- 标题 -->
+  <text x="300" y="380" text-anchor="middle" font-size="18" font-weight="bold" fill="#000">
+    三层 C/S 与 B/S 架构
+  </text>
+  
+  <!-- 左侧 (a) C/S架构 -->
+  <text x="130" y="365" text-anchor="middle" font-size="16" fill="#000">(a)</text>
+  
+  <!-- 前台界面 -->
+  <rect x="40" y="30" width="180" height="70" rx="15" fill="none" stroke="#000" stroke-width="2"/>
+  <text x="130" y="70" text-anchor="middle" font-size="16" fill="#000">前台界面</text>
+  
+  <!-- 双向箭头1：前台界面 <-> 后台服务 -->
+  <line x1="125" y1="100" x2="125" y2="130" stroke="#000" stroke-width="1" marker-end="url(#arrowdown)"/>
+  <line x1="135" y1="130" x2="135" y2="100" stroke="#000" stroke-width="1" marker-end="url(#arrowup)"/>
+  
+  <!-- 后台服务 -->
+  <rect x="40" y="130" width="180" height="70" rx="15" fill="none" stroke="#000" stroke-width="2"/>
+  <text x="130" y="170" text-anchor="middle" font-size="16" fill="#000">后台服务</text>
+  
+  <!-- 双向箭头2：后台服务 <-> 数据库 -->
+  <line x1="125" y1="200" x2="125" y2="230" stroke="#000" stroke-width="1" marker-end="url(#arrowdown)"/>
+  <line x1="135" y1="230" x2="135" y2="200" stroke="#000" stroke-width="1" marker-end="url(#arrowup)"/>
+  
+  <!-- 数据库 (圆柱体) -->
+  <ellipse cx="130" cy="240" rx="90" ry="15" fill="none" stroke="#000" stroke-width="2"/>
+  <line x1="40" y1="240" x2="40" y2="290" stroke="#000" stroke-width="2"/>
+  <line x1="220" y1="240" x2="220" y2="290" stroke="#000" stroke-width="2"/>
+  <ellipse cx="130" cy="290" rx="90" ry="15" fill="none" stroke="#000" stroke-width="2"/>
+  <text x="130" y="270" text-anchor="middle" font-size="16" fill="#000">数据库</text>
+  
+  <!-- 右侧 (b) B/S架构 -->
+  <text x="430" y="365" text-anchor="middle" font-size="16" fill="#000">(b)</text>
+  
+  <!-- Web浏览器 -->
+  <rect x="340" y="30" width="180" height="70" rx="15" fill="none" stroke="#000" stroke-width="2"/>
+  <text x="430" y="60" text-anchor="middle" font-size="16" fill="#000">Web</text>
+  <text x="430" y="80" text-anchor="middle" font-size="16" fill="#000">浏览器</text>
+  
+  <!-- 双向箭头1：Web浏览器 <-> Web服务器 -->
+  <line x1="425" y1="100" x2="425" y2="130" stroke="#000" stroke-width="1" marker-end="url(#arrowdown)"/>
+  <line x1="435" y1="130" x2="435" y2="100" stroke="#000" stroke-width="1" marker-end="url(#arrowup)"/>
+  
+  <!-- Web服务器 -->
+  <rect x="340" y="130" width="180" height="70" rx="15" fill="none" stroke="#000" stroke-width="2"/>
+  <text x="430" y="160" text-anchor="middle" font-size="16" fill="#000">Web</text>
+  <text x="430" y="180" text-anchor="middle" font-size="16" fill="#000">服务器</text>
+  
+  <!-- 双向箭头2：Web服务器 <-> 数据库 -->
+  <line x1="425" y1="200" x2="425" y2="230" stroke="#000" stroke-width="1" marker-end="url(#arrowdown)"/>
+  <line x1="435" y1="230" x2="435" y2="200" stroke="#000" stroke-width="1" marker-end="url(#arrowup)"/>
+  
+  <!-- 数据库 (圆柱体) -->
+  <ellipse cx="430" cy="240" rx="90" ry="15" fill="none" stroke="#000" stroke-width="2"/>
+  <line x1="340" y1="240" x2="340" y2="290" stroke="#000" stroke-width="2"/>
+  <line x1="520" y1="240" x2="520" y2="290" stroke="#000" stroke-width="2"/>
+  <ellipse cx="430" cy="290" rx="90" ry="15" fill="none" stroke="#000" stroke-width="2"/>
+  <text x="430" y="270" text-anchor="middle" font-size="16" fill="#000">数据库</text>
+  
+  <!-- 箭头定义 -->
+  <defs>
+    <marker id="arrowdown" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#000" />
+    </marker>
+    <marker id="arrowup" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <polygon points="0 0, 10 5, 0 10" fill="#000" />
+    </marker>
+  </defs>
+</svg>
