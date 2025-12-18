@@ -1,3 +1,22 @@
+# --- Global Ignore ---
+# Ignore everything in the root directory by default
+/*
+
+# --- Exceptions (Keep these) ---
+!.gitignore
+!.env
+!/backend/
+!/frontend/
+!/ziliao/
+
+# --- Specific Folder Rules ---
+
+# Inside ziliao, ignore everything except images
+/ziliao/*
+!/ziliao/images/
+
+# --- Standard Language Ignores (Apply to allowed directories) ---
+
 # Python
 __pycache__/
 *.py[cod]
@@ -20,7 +39,6 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-.env
 .venv
 env/
 venv/
@@ -35,7 +53,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .npm
-dist/
 .cache/
 .parcel-cache
 
@@ -44,11 +61,11 @@ dist/
 .vscode/
 *.swp
 *.swo
-.DS_Store
 
 # OS
 Thumbs.db
 Desktop.ini
+.DS_Store
 
 # Logs
 logs/
