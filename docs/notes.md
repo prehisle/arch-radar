@@ -64,7 +64,7 @@ newgrp docker
 - 优化构建上下文
 - 排除 node_modules、__pycache__、.git 等
 
-✅ **.env.production** (489B)
+✅ **.env.docker.example** (489B)
 - 环境变量模板
 - 包含数据库、Redis、AI API 密钥配置项
 
@@ -140,7 +140,7 @@ git push origin main
 #### 本地测试（可选）
 ```bash
 # 1. 配置环境变量
-cp .env.production .env
+cp .env.docker.example .env
 nano .env  # 修改数据库密码和 API 密钥
 
 # 2. 启动所有服务
@@ -169,7 +169,7 @@ docker-compose up -d
 - `docker-compose.yml` - 本地测试编排
 - `.dockerignore` - 构建优化
 - `backend/requirements-prod.txt` - 生产依赖
-- `.env.production` - 环境变量模板
+- `.env.docker.example` - Docker Compose 环境变量模板
 
 **部署文档（2个）**:
 - `sealos/UI-DEPLOY.md` - Sealos UI 部署详细手册（主要）

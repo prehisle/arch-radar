@@ -24,7 +24,7 @@
 │   └── DEPLOY.md                  # Sealos 部署详细文档
 ├── docker-compose.yml             # Docker Compose 配置
 ├── .dockerignore                  # Docker 构建排除文件
-├── .env.production                # 生产环境变量模板
+├── .env.docker.example            # Docker Compose 环境变量模板
 └── backend/requirements-prod.txt  # 生产环境依赖
 
 ```
@@ -37,7 +37,7 @@
 
 ```bash
 # 1. 配置环境变量
-cp .env.production .env
+cp .env.docker.example .env
 nano .env  # 修改数据库密码和 API 密钥
 
 # 2. 启动所有服务
@@ -113,7 +113,7 @@ kubectl apply -f base/ingress.yaml
 ### 环境变量
 
 所有环境变量在以下文件中配置：
-- **docker-compose**: `.env.production`
+- **docker-compose**: `.env.docker.example`
 - **Sealos**: `sealos/base/config.yaml`
 
 必需配置：

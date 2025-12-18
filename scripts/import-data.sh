@@ -20,7 +20,9 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
     export $(grep -v '^#' "$PROJECT_ROOT/.env" | grep MYSQL_ROOT_PASSWORD | xargs)
 else
     echo "❌ 错误: 找不到 .env 文件"
-    echo "请先创建 .env 文件或从 .env.production 复制"
+    echo "请先创建 .env 文件："
+    echo "  - 本地开发: cp .env.example .env"
+    echo "  - Docker 环境: cp .env.docker.example .env"
     exit 1
 fi
 
