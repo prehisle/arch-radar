@@ -5,6 +5,7 @@
 # --- Exceptions (Keep these) ---
 !.gitignore
 !.env
+!*.md
 !/backend/
 !/frontend/
 !/ziliao/
