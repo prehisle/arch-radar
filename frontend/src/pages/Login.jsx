@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
+import { buildApiUrl } from '../utils/apiBase';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin-secret';
 
 const SECRET_KEY = "your-secret-key-please-change-it";
@@ -20,7 +20,12 @@ function Login() {
 
   const fetchCaptcha = async () => {
     try {
-      const res = await axios.get(`${BASE_URL}/api/auth/captcha`, {
+      // Clean up previous captcha image URL
+      if (captchaImage) {
+        URL.revokeObjectURL(captchaImage);
+      }
+
+      const res = await axios.get(buildApiUrl('/api/auth/captcha'), {
         responseType: 'blob'
       });
       // Axios headers are lowercase
@@ -74,7 +79,7 @@ function Login() {
       console.log("Password encrypted.");
 
       console.log("Sending login request...");
-      const res = await axios.post(`${BASE_URL}/api/auth/login`, {
+      const res = await axios.post(buildApiUrl('/api/auth/login'), {
         username,
         password: encryptedPassword,
         captcha_code: captchaCode,

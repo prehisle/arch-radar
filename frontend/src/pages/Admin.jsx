@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Database, Settings, Trash2, Edit2, Search, Save, X, FileText, LayoutDashboard, LogOut } from 'lucide-react';
 import axios from 'axios';
+import { buildApiUrl } from '../utils/apiBase';
 import Dashboard from '../components/Dashboard';
-import { 
-  uploadAdminFile, getAdminData, deleteAdminData, updateAdminData, 
-  getAIConfig, updateAIConfig 
+import {
+  uploadAdminFile, getAdminData, deleteAdminData, updateAdminData,
+  getAIConfig, updateAIConfig
 } from '../api';
 
 const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin-secret';
@@ -24,8 +25,7 @@ const Admin = () => {
     if (confirm('确定要退出登录吗？')) {
       try {
           console.log("Logging out...");
-          const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-          await axios.post(`${baseUrl}/api/auth/logout`, {}, {
+          await axios.post(buildApiUrl('/api/auth/logout'), {}, {
               headers: {
                   'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
               }

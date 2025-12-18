@@ -1,15 +1,18 @@
 import axios from 'axios';
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { getApiBaseUrl } from './utils/apiBase';
 
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: getApiBaseUrl(),
+  timeout: 30000,
 });
 
 // Request interceptor to add token
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('admin_token');
-  if (token && config.url.includes('/admin') || config.url.includes('/dashboard')) {
+  const url = config.url || '';
+
+  if (token && (url.includes('/admin') || url.includes('/dashboard'))) {
+    config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
