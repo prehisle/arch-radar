@@ -1,0 +1,139 @@
+name: Build and Push Docker Images
+
+# 触发条件：
+# 1. Push 到 main 分支 - 构建并推送 latest 和 sha-xxx 标签
+# 2. 创建 Git tag (v*.*.*) - 构建并推送版本标签
+# 3. Pull Request - 仅构建验证，不推送镜像
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - main
+
+# 工作流权限：
+# - contents:read: 读取仓库代码
+# - packages:write: 推送镜像到 GitHub Container Registry
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+
+    # 使用 matrix 策略并行构建 backend 和 frontend
+    strategy:
+      fail-fast: false  # 一个构建失败不影响另一个
+      matrix:
+        include:
+          - service: backend
+            dockerfile: docker/Dockerfile.backend
+            context: .
+          - service: frontend
+            dockerfile: docker/Dockerfile.frontend
+            context: .
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 设置 Docker Buildx（支持多平台构建和缓存）
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3. 登录到 GitHub Container Registry
+      #    注意：PR 不需要登录（不推送）
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 4. 生成 Docker 镜像的 tags 和 labels
+      #    - main 分支：latest + sha-<commit>
+      #    - Git tag：v1.0.0（保留 v 前缀）
+      #    - PR：不推送
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/arch-radar-${{ matrix.service }}
+          tags: |
+            # main 分支推送时生成 latest 标签
+            type=raw,value=latest,enable={{is_default_branch}}
+            # main 分支推送时生成 sha-<commit> 标签（用于精确回滚）
+            type=sha,prefix=sha-,enable={{is_default_branch}}
+            # Git tag 推送时生成版本标签（如 v1.0.0，保留 v 前缀）
+            type=ref,event=tag
+          labels: |
+            org.opencontainers.image.title=arch-radar-${{ matrix.service }}
+            org.opencontainers.image.description=Intelligent exam preparation system - ${{ matrix.service }}
+            org.opencontainers.image.vendor=arch-radar
+
+      # 5. 构建 Docker 镜像（PR 时只构建，非 PR 时构建并推送）
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          # PR 不推送，其他情况推送
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 使用 GitHub Actions 缓存加速构建
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # 构建参数（可选，根据需要添加）
+          # build-args: |
+          #   NODE_ENV=production
+
+      # 6. 输出镜像摘要和标签（用于验证和追踪）
+      - name: Output image digest and tags
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "✅ Image built successfully!"
+          echo ""
+          echo "📦 Image digest:"
+          echo "${{ steps.build.outputs.digest }}"
+          echo ""
+          echo "🏷️ Image tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+
+  # 可选：镜像扫描任务（推荐在生产环境启用）
+  # 注意：如需启用，需要添加权限 security-events: write
+  #
+  # security-scan:
+  #   name: Security Scan (${{ matrix.service }})
+  #   needs: build-and-push
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name != 'pull_request'
+  #   permissions:
+  #     security-events: write
+  #
+  #   strategy:
+  #     matrix:
+  #       service: [backend, frontend]
+  #
+  #   steps:
+  #     - name: Run Trivy vulnerability scanner
+  #       uses: aquasecurity/trivy-action@0.24.0  # 使用固定版本而非 master
+  #       with:
+  #         # 注意：这里应该扫描刚构建的 digest，而不是 latest
+  #         # 实际使用时需要从 build-and-push job 传递 digest
+  #         image-ref: ghcr.io/${{ github.repository_owner }}/arch-radar-${{ matrix.service }}@${{ needs.build-and-push.outputs.digest }}
+  #         format: 'sarif'
+  #         output: 'trivy-results.sarif'
+  #
+  #     - name: Upload Trivy results to GitHub Security tab
+  #       uses: github/codeql-action/upload-sarif@v3
+  #       with:
+  #         sarif_file: 'trivy-results.sarif'
