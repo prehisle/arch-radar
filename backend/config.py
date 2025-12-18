@@ -76,4 +76,8 @@ class Settings:
     # Security
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-please-change-it")
 
+    # Admin Account
+    ADMIN_DEFAULT_USERNAME = os.getenv("ADMIN_DEFAULT_USERNAME", "admin")
+    ADMIN_DEFAULT_PASSWORD = os.getenv("ADMIN_DEFAULT_PASSWORD", "")
+
 settings = Settings()

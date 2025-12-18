@@ -64,6 +64,8 @@ services:
       QWEN_API_KEY: ${QWEN_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       PROXY_URL: ${PROXY_URL}
+      ADMIN_DEFAULT_USERNAME: ${ADMIN_DEFAULT_USERNAME:-admin}
+      ADMIN_DEFAULT_PASSWORD: ${ADMIN_DEFAULT_PASSWORD}
     depends_on:
       mysql:
         condition: service_healthy
@@ -74,7 +76,7 @@ services:
     networks:
       - arch-radar-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/dashboard/stats"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

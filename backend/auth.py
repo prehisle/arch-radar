@@ -12,6 +12,7 @@ import io
 from fastapi.responses import StreamingResponse
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+import hashlib
 
 from backend.database import get_session, redis_client
 from backend.models import AdminUser
@@ -59,11 +60,33 @@ def decrypt_password(encrypted_password: str) -> str:
         print(f"Decryption failed: {e}")
         return ""
 
+def _prepare_password_for_bcrypt(password: str) -> str:
+    """
+    bcrypt 限制密码不超过 72 字节。若密码超长，使用 SHA-256 预哈希。
+    """
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        # 对密码做 SHA-256 摘要，然后用 hex 表示（64 字符），保证不超 72 字节
+        return hashlib.sha256(password_bytes).hexdigest()
+    return password
+
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    """验证密码，自动处理长密码"""
+    try:
+        prepared = _prepare_password_for_bcrypt(plain_password)
+        return pwd_context.verify(prepared, hashed_password)
+    except Exception as e:
+        print(f"Password verification error: {e}")
+        return False
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    """生成密码哈希，自动处理长密码"""
+    try:
+        prepared = _prepare_password_for_bcrypt(password)
+        return pwd_context.hash(prepared)
+    except Exception as e:
+        print(f"Password hashing error: {e}")
+        raise
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -176,3 +199,26 @@ async def login(req: LoginRequest, session: Session = Depends(get_session)):
 @router.get("/me")
 async def read_users_me(current_user: AdminUser = Depends(get_current_admin)):
     return {"username": current_user.username, "active": current_user.is_active}
+
+# --- Admin Initialization ---
+def ensure_default_admin(session: Session):
+    """
+    启动时自动创建默认管理员账号（如果不存在）
+    """
+    username = settings.ADMIN_DEFAULT_USERNAME
+    password = settings.ADMIN_DEFAULT_PASSWORD
+
+    if not password:
+        print("[WARNING] ADMIN_DEFAULT_PASSWORD not set, skipping default admin creation")
+        return
+
+    existing = session.exec(select(AdminUser).where(AdminUser.username == username)).first()
+    if not existing:
+        hashed = get_password_hash(password)
+        admin = AdminUser(username=username, hashed_password=hashed, is_active=True)
+        session.add(admin)
+        session.commit()
+        print(f"[INFO] Default admin user created: {username}")
+    else:
+        print(f"[INFO] Admin user '{username}' already exists")
+

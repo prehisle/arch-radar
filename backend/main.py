@@ -14,7 +14,7 @@ from backend.models import Question, ExamSession, KnowledgePoint, AIConfig, Majo
 from backend.parsers import parse_weight_table, parse_questions, parse_syllabus
 from backend.config import settings
 from backend.ai_service import generate_variant_questions
-from backend.auth import router as auth_router, get_current_admin
+from backend.auth import router as auth_router, get_current_admin, ensure_default_admin
 from backend.models import AdminUser
 
 from fastapi.staticfiles import StaticFiles
@@ -97,6 +97,9 @@ def on_startup():
         if count_linked > 0:
             session.commit()
             print(f"Linked {count_linked} KnowledgePoints to MajorChapters.")
+
+        # Ensure default admin account exists
+        ensure_default_admin(session)
 
 # -----------------------------------------------------------------------------
 # Admin APIs
