@@ -4,6 +4,7 @@
 
 # --- Exceptions (Keep these) ---
 !.gitignore
+!.dockerignore
 !*.md
 !.env.example
 !.env.docker.example
