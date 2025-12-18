@@ -2,10 +2,19 @@
 FROM node:18-alpine as build
 WORKDIR /app
 
+# 声明构建参数
+ARG VITE_API_BASE_URL=/
+ARG VITE_ADMIN_PATH=/admin-secret
+
 COPY frontend/package*.json ./
 RUN npm ci
 
 COPY frontend/ ./
+
+# 构建时将 ARG 导出为环境变量供 Vite 使用
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_ADMIN_PATH=${VITE_ADMIN_PATH}
+
 RUN npm run build
 
 # Stage 2: Production

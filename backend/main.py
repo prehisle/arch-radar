@@ -40,6 +40,12 @@ app.add_middleware(
     expose_headers=["X-Captcha-ID"],
 )
 
+# Health check endpoint (no authentication required)
+@app.get("/health")
+def health_check():
+    """健康检查端点，用于容器健康检查"""
+    return {"status": "healthy", "service": "arch-radar-backend"}
+
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()

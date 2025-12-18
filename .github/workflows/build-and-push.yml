@@ -92,9 +92,10 @@ jobs:
           # 使用 GitHub Actions 缓存加速构建
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # 构建参数（可选，根据需要添加）
-          # build-args: |
-          #   NODE_ENV=production
+          # 构建参数
+          build-args: |
+            VITE_API_BASE_URL=/
+            VITE_ADMIN_PATH=${{ secrets.ADMIN_PATH || '/admin-secret' }}
 
       # 6. 输出镜像摘要和标签（用于验证和追踪）
       - name: Output image digest and tags

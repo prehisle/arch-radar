@@ -99,3 +99,7 @@ temp/
 /data/sql/
 docker/mysql-init/99-data.sql
 *.sql.backup
+
+
+
+docker/.htpasswd

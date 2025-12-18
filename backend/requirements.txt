@@ -11,3 +11,4 @@ httpx
 python-dotenv
 redis
 requests
+captcha
