@@ -118,6 +118,32 @@ const Exam = () => {
 
   if (!sessionData) return <div className="p-8 text-center">Loading...</div>;
 
+  // Handle empty questions array (no questions in database)
+  if (!sessionData.questions || sessionData.questions.length === 0) {
+    return (
+      <PageLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-80px)]">
+          <div className="glass-card p-12 rounded-2xl max-w-md text-center">
+            <div className="w-20 h-20 bg-[#e0f7fa] rounded-full flex items-center justify-center mx-auto mb-6">
+              <HelpCircle className="w-10 h-10 text-[#00838f]" />
+            </div>
+            <h2 className="text-2xl font-bold text-[#00695c] mb-4">暂无题目</h2>
+            <p className="text-[#546e7a] mb-8 leading-relaxed">
+              数据库中还没有题目数据。<br/>
+              请联系管理员上传题目后再开始考试。
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-8 py-3 rounded-xl bg-gradient-to-r from-[#00acc1] to-[#0097a7] text-white font-bold shadow-lg hover:shadow-xl transition-all"
+            >
+              返回首页
+            </button>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
   const currentQ = sessionData.questions[currentQIndex];
   const formatTime = (s) => {
     if (typeof s !== 'number' || isNaN(s)) return "00:00:00";

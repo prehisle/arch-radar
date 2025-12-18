@@ -6,9 +6,14 @@
 !.gitignore
 !.env
 !*.md
+!.env.example
+!.env.docker.example
 !/backend/
 !/frontend/
 !/ziliao/
+!/docs/
+!/scripts/
+!/data/
 
 # --- Specific Folder Rules ---
 
@@ -75,3 +80,8 @@ logs/
 # Temp
 tmp/
 temp/
+
+# 私有数据文件（不开源）
+/data/sql/
+docker/mysql-init/99-data.sql
+*.sql.backup
