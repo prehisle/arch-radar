@@ -80,7 +80,7 @@ kubectl apply -f base/frontend-deployment.yaml
 kubectl apply -f base/ingress.yaml
 ```
 
-详细说明请查看 [sealos/DEPLOY.md](sealos/DEPLOY.md)
+详细说明请查看 [sealos/DEPLOY.md](../sealos/DEPLOY.md)
 
 ## 📊 架构对比
 
@@ -181,7 +181,7 @@ kubectl rollout undo deployment/arch-radar-backend
 ## 📖 文档
 
 - **本地部署**: 查看项目计划文件 `.claude/plans/swirling-drifting-moon.md`
-- **Sealos 部署**: [sealos/DEPLOY.md](sealos/DEPLOY.md)
+- **Sealos 部署**: [sealos/DEPLOY.md](../sealos/DEPLOY.md)
 - **项目文档**: [CLAUDE.md](../CLAUDE.md)
 - **API 文档**: 运行后访问 `http://localhost:8000/docs`
 
@@ -197,7 +197,7 @@ kubectl rollout undo deployment/arch-radar-backend
 
 常见问题和解决方案请查看：
 - Docker Compose: 项目计划文件中的"故障排查"章节
-- Sealos: [sealos/DEPLOY.md](sealos/DEPLOY.md) 中的"故障排查"章节
+- Sealos: [sealos/DEPLOY.md](../sealos/DEPLOY.md) 中的"故障排查"章节
 
 ## 📞 技术支持
 

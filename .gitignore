@@ -8,6 +8,9 @@
 !/backend/
 !/frontend/
 !/ziliao/
+!/docs/
+!/scripts/
+!/data/
 
 # --- Specific Folder Rules ---
 
@@ -76,7 +79,6 @@ tmp/
 temp/
 
 # 私有数据文件（不开源）
-zhineng_test_sys.sql
+/data/sql/
 docker/mysql-init/99-data.sql
 *.sql.backup
-data/

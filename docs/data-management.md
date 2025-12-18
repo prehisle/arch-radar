@@ -16,7 +16,7 @@
 docker compose up -d
 
 # 2. 运行导入脚本
-./import-data.sh zhineng_test_sys.sql
+./scripts/import-data.sh data/sql/zhineng_test_sys.sql
 
 # 3. 验证数据
 docker compose exec mysql mysql -uroot -p zhineng_test_sys -e "SELECT COUNT(*) FROM question;"
@@ -26,7 +26,7 @@ docker compose exec mysql mysql -uroot -p zhineng_test_sys -e "SELECT COUNT(*) F
 
 ```bash
 # 直接通过 docker compose 导入
-docker compose exec -T mysql mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" zhineng_test_sys < zhineng_test_sys.sql
+docker compose exec -T mysql mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" zhineng_test_sys < data/sql/zhineng_test_sys.sql
 ```
 
 ### 方式 3：初始化时自动导入
@@ -35,7 +35,7 @@ docker compose exec -T mysql mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" zhineng_tes
 
 ```bash
 # 1. 复制 SQL 文件到初始化目录（使用 99 前缀确保最后执行）
-cp zhineng_test_sys.sql docker/mysql-init/99-data.sql
+cp data/sql/zhineng_test_sys.sql docker/mysql-init/99-data.sql
 
 # 2. 重建 MySQL 容器（会清空所有数据！）
 docker compose down -v
@@ -53,7 +53,7 @@ docker compose up -d
 kubectl get pods | grep mysql
 
 # 2. 导入数据
-kubectl exec -i <mysql-pod-name> -- mysql -uroot -p"$MYSQL_ROOT_PASSWORD" zhineng_test_sys < zhineng_test_sys.sql
+kubectl exec -i <mysql-pod-name> -- mysql -uroot -p"$MYSQL_ROOT_PASSWORD" zhineng_test_sys < data/sql/zhineng_test_sys.sql
 
 # 3. 验证
 kubectl exec <mysql-pod-name> -- mysql -uroot -p"$MYSQL_ROOT_PASSWORD" zhineng_test_sys -e "SELECT COUNT(*) FROM question;"
@@ -114,7 +114,7 @@ gpg -c zhineng_test_sys.sql  # 生成 .gpg 文件
 
 # 解密使用
 gpg -d zhineng_test_sys.sql.gpg > zhineng_test_sys.sql
-./import-data.sh zhineng_test_sys.sql
+./scripts/import-data.sh data/sql/zhineng_test_sys.sql
 ```
 
 **选项 C：私有对象存储**
@@ -189,7 +189,7 @@ sed 's/INSERT INTO/INSERT IGNORE INTO/g' zhineng_test_sys.sql > new_questions.sq
 # 方式1: 重建容器（最干净）
 docker compose down -v
 docker compose up -d
-./import-data.sh
+./scripts/import-data.sh
 
 # 方式2: 清空表（保留结构）
 docker compose exec mysql mysql -uroot -p zhineng_test_sys -e "

@@ -177,7 +177,7 @@ docker-compose up -d
 
 **辅助文件**:
 - `docker/mysql-init/01-init.sql` - 数据库初始化
-- `DEPLOYMENT.md` - 部署概览文档
+- `deployment.md` - 部署概览文档
 
 ---
 
