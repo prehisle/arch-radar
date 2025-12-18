@@ -4,7 +4,6 @@
 
 # --- Exceptions (Keep these) ---
 !.gitignore
-!.env
 !.dockerignore
 !*.md
 !.env.example
@@ -27,6 +26,16 @@
 !/ziliao/images/
 
 # --- Standard Language Ignores (Apply to allowed directories) ---
+
+# 环境变量文件（禁止提交）
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!.env.docker.example
+!**/.env.example
+!**/.env.docker.example
 
 # Python
 __pycache__/
