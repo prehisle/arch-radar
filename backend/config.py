@@ -73,4 +73,7 @@ class Settings:
     # System Proxy
     PROXY_URL = os.getenv("PROXY_URL", None)
 
+    # Security
+    SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-please-change-it")
+
 settings = Settings()

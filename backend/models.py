@@ -101,3 +101,10 @@ class AIConfig(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     config_key: str = Field(unique=True) # e.g. "gemini_api_key", "prompt_report"
     value: str = Field(sa_column=Column(Text))
+
+class AdminUser(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)
+    hashed_password: str
+    is_active: bool = Field(default=True)
+

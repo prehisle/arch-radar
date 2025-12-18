@@ -6,6 +6,30 @@ const api = axios.create({
   baseURL: BASE_URL,
 });
 
+// Request interceptor to add token
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('admin_token');
+  if (token && config.url.includes('/admin') || config.url.includes('/dashboard')) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor to handle 401
+api.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response && error.response.status === 401) {
+       // Only redirect if we are in an admin context to avoid disrupting normal users
+       if (window.location.pathname.includes(import.meta.env.VITE_ADMIN_PATH)) {
+           localStorage.removeItem('admin_token');
+           window.location.href = `${import.meta.env.VITE_ADMIN_PATH}/login`;
+       }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Mock fingerprint
 const getFingerprint = () => {
   let fp = localStorage.getItem('fingerprint');

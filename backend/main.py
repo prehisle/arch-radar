@@ -14,10 +14,14 @@ from backend.models import Question, ExamSession, KnowledgePoint, AIConfig, Majo
 from backend.parsers import parse_weight_table, parse_questions, parse_syllabus
 from backend.config import settings
 from backend.ai_service import generate_variant_questions
+from backend.auth import router as auth_router, get_current_admin
+from backend.models import AdminUser
 
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Smart Assessment System - System Architect")
+
+app.include_router(auth_router)
 
 # Mount static files for images
 import os
@@ -33,6 +37,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Captcha-ID"],
 )
 
 @app.on_event("startup")
@@ -1306,7 +1311,7 @@ def get_material_stats(db: Session = Depends(get_session)):
 
 
 @app.get("/api/dashboard/stats")
-def get_dashboard_stats(db: Session = Depends(get_session)):
+async def get_dashboard_stats(db: Session = Depends(get_session), admin: AdminUser = Depends(get_current_admin)):
     # Try cache
     cache_key = "dashboard_stats"
     cached = redis_client.get(cache_key)

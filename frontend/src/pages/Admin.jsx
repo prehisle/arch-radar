@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Database, Settings, Trash2, Edit2, Search, Save, X, FileText, LayoutDashboard } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Upload, Database, Settings, Trash2, Edit2, Search, Save, X, FileText, LayoutDashboard, LogOut } from 'lucide-react';
+import axios from 'axios';
 import Dashboard from '../components/Dashboard';
 import { 
   uploadAdminFile, getAdminData, deleteAdminData, updateAdminData, 
   getAIConfig, updateAIConfig 
 } from '../api';
 
+const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin-secret';
+
 const Admin = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [message, setMessage] = useState('');
 
@@ -15,10 +20,39 @@ const Admin = () => {
     setTimeout(() => setMessage(''), 5000);
   };
 
+  const handleLogout = async () => {
+    if (confirm('确定要退出登录吗？')) {
+      try {
+          console.log("Logging out...");
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+          await axios.post(`${baseUrl}/api/auth/logout`, {}, {
+              headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+              }
+          });
+          console.log("Logout API called.");
+      } catch (e) {
+          console.warn("Logout failed on server:", e);
+      } finally {
+          localStorage.removeItem('admin_token');
+          navigate(`${ADMIN_PATH}/login`);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">后台管理系统</h1>
+        <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">后台管理系统</h1>
+            <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+                <LogOut className="w-4 h-4" />
+                退出登录
+            </button>
+        </div>
 
         {/* Tabs */}
         <div className="flex space-x-4 mb-6 border-b border-gray-200 overflow-x-auto">
