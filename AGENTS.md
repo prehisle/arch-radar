@@ -479,7 +479,7 @@ DATABASE_URL=mysql+pymysql://user:pass@localhost/db
 QWEN_API_KEY=sk-xxxxx
 
 # ❌ 绝对避免：硬编码
-QWEN_API_KEY = "sk-dece252542..."  # 危险！
+QWEN_API_KEY = "sk-xxxxxxxxxx"  # 危险！
 ```
 
 ### 输入验证
