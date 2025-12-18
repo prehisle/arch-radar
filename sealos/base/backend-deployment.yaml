@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arch-radar-backend
+  labels:
+    app: arch-radar-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: arch-radar-backend
+  template:
+    metadata:
+      labels:
+        app: arch-radar-backend
+    spec:
+      containers:
+      - name: backend
+        image: registry.cn-hangzhou.aliyuncs.com/your-namespace/arch-radar-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: arch-radar-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: arch-radar-secrets
+              key: redis-url
+        - name: AI_PROVIDER
+          valueFrom:
+            configMapKeyRef:
+              name: arch-radar-config
+              key: ai-provider
+        - name: QWEN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: arch-radar-secrets
+              key: qwen-api-key
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: arch-radar-secrets
+              key: gemini-api-key
+              optional: true
+        - name: PROXY_URL
+          valueFrom:
+            configMapKeyRef:
+              name: arch-radar-config
+              key: proxy-url
+              optional: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /api/dashboard/stats
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/dashboard/stats
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: images
+          mountPath: /app/ziliao/images
+          readOnly: true
+      volumes:
+      - name: images
+        persistentVolumeClaim:
+          claimName: arch-radar-images-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: arch-radar-backend
+  labels:
+    app: arch-radar-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: arch-radar-backend

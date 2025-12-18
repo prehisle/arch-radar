@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: arch-radar-init-images
+  labels:
+    app: arch-radar
+spec:
+  template:
+    spec:
+      containers:
+      - name: init-images
+        image: busybox:latest
+        command:
+        - sh
+        - -c
+        - |
+          echo "初始化图片资源..."
+          echo "请手动将 ziliao/images/ 目录的内容上传到 PVC 中"
+          echo "或者使用 kubectl cp 命令："
+          echo "kubectl cp ziliao/images/ <namespace>/<pod-name>:/app/ziliao/images/"
+          sleep 10
+        volumeMounts:
+        - name: images
+          mountPath: /app/ziliao/images
+      volumes:
+      - name: images
+        persistentVolumeClaim:
+          claimName: arch-radar-images-pvc
+      restartPolicy: Never
+  backoffLimit: 3

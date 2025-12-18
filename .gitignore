@@ -15,6 +15,9 @@
 !/scripts/
 !/data/
 !/.github/
+!/docker/
+!/sealos/
+!/docker-compose.yml
 
 # --- Specific Folder Rules ---
 

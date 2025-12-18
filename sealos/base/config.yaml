@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arch-radar-config
+  labels:
+    app: arch-radar
+data:
+  ai-provider: "qwen"
+  # 可选：如果需要 HTTP 代理访问 AI API
+  # proxy-url: "http://proxy.example.com:8080"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: arch-radar-secrets
+  labels:
+    app: arch-radar
+type: Opaque
+stringData:
+  # MySQL 连接字符串 - 需要替换为 Sealos MySQL 实例的连接信息
+  # 格式：mysql+pymysql://用户名:密码@主机:端口/数据库名
+  database-url: "mysql+pymysql://root:CHANGE_THIS@mysql-service:3306/zhineng_test_sys"
+
+  # Redis 连接字符串 - 需要替换为 Sealos Redis 实例的连接信息
+  # 格式：redis://:密码@主机:端口/数据库编号
+  redis-url: "redis://:CHANGE_THIS@redis-service:6379/0"
+
+  # 通义千问 API 密钥
+  qwen-api-key: "CHANGE_THIS_TO_YOUR_QWEN_API_KEY"
+
+  # Gemini API 密钥（可选）
+  gemini-api-key: ""
