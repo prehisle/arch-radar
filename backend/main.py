@@ -746,7 +746,7 @@ def start_exam(
             generated_all = generate_variant_questions(all_seeds_data, 1, api_key=api_key)
             
             duration = time.time() - start_ts
-            db.add(AILog(call_type="smart_paper_error_driven", status="success", response_time=duration))
+            db.add(AILog(call_type="smart_paper", status="success", response_time=duration))
             
             # Save
             new_qs = []
