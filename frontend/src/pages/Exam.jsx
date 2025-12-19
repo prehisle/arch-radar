@@ -185,7 +185,7 @@ const Exam = () => {
                    "See options but can't see stem" implies options are long and stem scrolls out of view.
                    Let's make the stem sticky at the top of this container.
                */}
-               <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm pb-4 mb-4 border-b border-gray-100 shadow-sm transition-all">
+               <div className="bg-white/95 pb-4 mb-4 border-b border-gray-100 shadow-sm transition-all">
                   <div className="prose max-w-none text-[#37474f] font-medium leading-loose text-lg">
                     <ReactMarkdown 
                         remarkPlugins={[remarkGfm, remarkMath]} 

@@ -650,7 +650,7 @@ def start_exam(
 
     selected = []
     
-    # 1. Select 2-3 "Low Weight" questions (General/Cold/Not Syllabus)
+    # 1. Select 5 "Low Weight" questions (General/Cold/Not Syllabus)
     # Fetch candidate questions via join
     q_low_weight = db.exec(select(Question).join(KnowledgePoint).where(
         KnowledgePoint.weight_level.in_(["一般", "冷门", "非考纲要求"])
@@ -658,11 +658,11 @@ def start_exam(
     
     # Filter History for Low Weight too
     low_weight_candidates = [q for q in q_low_weight if q.id not in user_history]
-    if len(low_weight_candidates) < 3: low_weight_candidates = q_low_weight
+    if len(low_weight_candidates) < 5: low_weight_candidates = q_low_weight
     
     low_weight_picks = []
     if low_weight_candidates:
-        count_low = min(len(low_weight_candidates), 3)
+        count_low = min(len(low_weight_candidates), 5)
         low_weight_picks = random.sample(low_weight_candidates, count_low)
         selected.extend(low_weight_picks)
         
@@ -672,8 +672,9 @@ def start_exam(
     q_exercise = [q for q in q_exercise if q.id not in picked_ids]
     
     # 2. Fill remaining slots
+    # Target: 22 Past, 45 Exercise
     selected.extend(weighted_sample(q_past, 22, exclude_ids=user_history))
-    selected.extend(weighted_sample(q_exercise, 37, exclude_ids=user_history))
+    selected.extend(weighted_sample(q_exercise, 45, exclude_ids=user_history))
     
     # Fill AI quota
     needed_ai = 75 - len(selected)
@@ -699,19 +700,20 @@ def start_exam(
         if q.knowledge_point_id:
             ai_by_kp.setdefault(q.knowledge_point_id, []).append(q)
             
-    # For each target KP, if we have < 3 AI questions, generate more
+    # For each target KP, if we have < 1 AI questions, generate 1
     # Optimize: Collect all seeds first and do ONE AI call
     all_seeds_data = []
     
     for kpid in target_kps:
         existing_ai_count = len(ai_by_kp.get(kpid, []))
-        if existing_ai_count < 3:
+        if existing_ai_count < 1:
             # Need to generate
             # Find seed questions for this KP (from Past/Exercise)
+            # Fetch 1 seed
             seeds = db.exec(select(Question).where(
                 Question.knowledge_point_id == kpid,
                 Question.source_type.in_(["历年真题", "章节练习", "past_paper", "exercise"])
-            ).limit(3)).all()
+            ).limit(1)).all()
             
             if seeds:
                 for q in seeds:
@@ -739,11 +741,11 @@ def start_exam(
                 api_key = api_conf.value if api_conf else settings.GEMINI_API_KEY
 
             start_ts = time.time()
-            # Batch generate: Pass all seeds at once
-            # Note: generate_variant_questions generates 1 variant per seed
-            generated = generate_variant_questions(all_seeds_data, 1, api_key=api_key) 
-            duration = time.time() - start_ts
             
+            # Batch generate: Pass all seeds at once (No batching needed for small N=3)
+            generated_all = generate_variant_questions(all_seeds_data, 1, api_key=api_key)
+            
+            duration = time.time() - start_ts
             db.add(AILog(call_type="smart_paper_error_driven", status="success", response_time=duration))
             
             # Save
@@ -752,11 +754,16 @@ def start_exam(
             # Helper to find original KP ID from generated item (based_on_id)
             seed_kp_map = {str(item["id"]): item["kp_id"] for item in all_seeds_data}
             
-            for item in generated:
+            for item in generated_all:
                 # Basic validation
-                if not item.get("content") or not item.get("options") or not item.get("answer"): continue
-                content = item.get("content", "").strip()
+                raw_content = item.get("content", "")
+                if not raw_content: continue
+                
+                content = str(raw_content).strip()
                 if len(content) < 5 or "xxx" in content.lower(): continue
+                
+                if not item.get("options") or not item.get("answer"): continue
+                
                 opts = item.get("options", [])
                 if not isinstance(opts, list) or len(opts) < 2: continue
                 
@@ -793,10 +800,29 @@ def start_exam(
     # Now select AI questions
     selected.extend(weighted_sample(q_ai, needed_ai, exclude_ids=user_history))
         
-    # Final check
+    # Final check and backfill
     if len(selected) < 75:
-        # Just take whatever we have
-        pass
+        needed_backfill = 75 - len(selected)
+        print(f"DEBUG: Insufficient questions ({len(selected)}), backfilling {needed_backfill}...")
+        
+        # Collect all used IDs
+        used_ids = {q.id for q in selected}
+        
+        # Try to fetch from database excluding already selected ones
+        # We fetch extra to ensure randomness
+        backfill_candidates = db.exec(select(Question).where(Question.id.not_in(used_ids)).limit(needed_backfill * 5)).all()
+        
+        if backfill_candidates:
+            # If we have enough, sample
+            if len(backfill_candidates) >= needed_backfill:
+                backfill_picks = random.sample(backfill_candidates, needed_backfill)
+            else:
+                backfill_picks = backfill_candidates
+                
+            selected.extend(backfill_picks)
+            print(f"DEBUG: Backfilled {len(backfill_picks)} questions.")
+        else:
+            print("DEBUG: No more questions available in DB to backfill.")
         
     # Shuffle final list
     random.shuffle(selected)
@@ -958,12 +984,11 @@ def submit_exam(
     # Update Redis Cache (History)
     update_user_question_history(session.user_fingerprint, session.question_ids)
     
-    session.score = score
-    session.is_submitted = True
-    session.end_time = datetime.utcnow()
+    final_score = score
+    final_end_time = datetime.utcnow()
     
     # Calculate duration in minutes
-    duration_seconds = (session.end_time - session.start_time).total_seconds()
+    duration_seconds = (final_end_time - session.start_time).total_seconds()
     duration_minutes = int(duration_seconds / 60)
     
     # Generate AI Report
@@ -981,12 +1006,13 @@ def submit_exam(
     
     # Run AI Generation
     # We run it synchronously here for simplicity, but for production use BackgroundTasks
+    # IMPORTANT: Do not modify session object before this to avoid holding DB locks during slow AI call (due to autoflush)
     try:
         # Fetch historical rates for context
         history_rates = get_user_kp_error_rates(db, session.user_fingerprint)
         
         start_ts = time.time()
-        report = generate_report(score, kp_stats, prompt_template, api_key=api_key, duration_minutes=duration_minutes, history_rates=history_rates)
+        report = generate_report(final_score, kp_stats, prompt_template, api_key=api_key, duration_minutes=duration_minutes, history_rates=history_rates)
         duration = time.time() - start_ts
         db.add(AILog(call_type="report", status="success", response_time=duration))
         
@@ -997,7 +1023,7 @@ def submit_exam(
             # Actually if it returns a dict with error, it technically succeeded in calling, but failed in content.
             # Let's count it as success in invocation, but maybe we want to know.
             # For now, keep it simple.
-            report = generate_ai_report_mock(score, kp_stats, db)
+            report = generate_ai_report_mock(final_score, kp_stats, db)
         else:
             # Inject radar data if AI succeeded
             report["radar_data"] = calculate_radar_data(kp_stats, db)
@@ -1005,14 +1031,18 @@ def submit_exam(
         duration = time.time() - start_ts
         db.add(AILog(call_type="report", status="failure", response_time=duration, error_message=str(e)))
         print(f"AI Service Exception: {e}")
-        report = generate_ai_report_mock(score, kp_stats, db)
+        report = generate_ai_report_mock(final_score, kp_stats, db)
 
     # Inject basic stats (accuracy, duration)
-    report["score"] = score
-    report["accuracy"] = int((score / 75) * 100)
+    report["score"] = final_score
+    report["accuracy"] = int((final_score / 75) * 100)
     report["duration_minutes"] = duration_minutes
     report["total_questions"] = 75
 
+    # Update Session - Now safe to acquire lock
+    session.score = final_score
+    session.is_submitted = True
+    session.end_time = final_end_time
     session.ai_report = report
     
     db.add(session)

@@ -3,7 +3,7 @@ import { getApiBaseUrl } from './utils/apiBase';
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  timeout: 30000,
+  timeout: 120000, // Increased to 120s for AI generation
 });
 
 // Request interceptor to add token
