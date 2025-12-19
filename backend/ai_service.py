@@ -186,7 +186,7 @@ def generate_variant_questions(seed_questions: list[Dict[str, Any]], count_per_s
         print(f"Variant Generation Exception: {e}")
         return []
 
-def call_qwen(prompt: str, api_key: str = None, model_name: str = "qwen3-max") -> Dict[str, Any]:
+def call_qwen(prompt: str, api_key: str = None, model_name: str = "qwen-plus") -> Dict[str, Any]:
     """
     Calls Qwen API (via DashScope compatible OpenAI client)
     """
