@@ -36,6 +36,12 @@ const processContent = (text) => {
     // This is often due to remark-gfm list parsing interference or lack of rehype-raw if HTML is mixed.
     // Let's ensure rehype-raw is used.
 
+    // Fix Tilde Strikethrough issue: Escape ~ used for ranges (e.g. +3~4) to prevent strikethrough
+    // We look for ~ that is surrounded by numbers or spaces, not ~~ (which is standard strikethrough)
+    // Actually GFM uses ~ for strikethrough sometimes or ~~. remark-gfm enables it.
+    // If we want to prevent it, we can escape it.
+    processed = processed.replace(/~/g, '\\~');
+
     processed = processed.replace(/(\d+(?:\.\d+)?)\s*[\*x]\s*10\^(\-?\d+)/g, '$$$1 \\times 10^{$2}$$');
     return processed;
 };
