@@ -156,11 +156,17 @@ const Exam = () => {
 
   return (
     <PageLayout>
-      <div className="flex flex-col md:flex-row h-auto md:h-[calc(100vh-80px)] gap-6">
+      {/* 
+         Simplified Layout for Mobile:
+         Remove fixed height constraint on mobile to allow natural scrolling.
+         Only enforce fixed height on MD screens and up.
+      */}
+      <div className="flex flex-col md:flex-row md:h-[calc(100vh-80px)] gap-6">
         <LoadingOverlay visible={submitting} message="正在智能阅卷与生成分析报告..." />
         
         {/* Left: Question Area */}
-        <div className="flex-1 flex flex-col min-w-0 h-[calc(100dvh-120px)] md:h-full">
+        {/* On mobile: min-h-[500px] to ensure visibility, h-auto to expand */}
+        <div className="flex-1 flex flex-col min-w-0 min-h-[60vh] md:h-full md:overflow-hidden">
           {/* Header */}
           <div className="glass-card flex justify-between items-center mb-6 p-6 rounded-2xl">
             <div>

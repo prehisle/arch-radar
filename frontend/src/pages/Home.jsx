@@ -16,7 +16,14 @@ const Home = () => {
       const data = await startExam();
       navigate(`/exam?sessionId=${data.session_id}`);
     } catch (e) {
-      alert('Failed to start exam');
+      console.error(e);
+      // alert('Failed to start exam');
+      // Show more details if timeout
+      if (e.code === 'ECONNABORTED' || e.message.includes('timeout')) {
+          alert('AI 组卷超时，请检查网络或稍后重试。');
+      } else {
+          alert(`Failed to start exam: ${e.message || 'Unknown error'}`);
+      }
     } finally {
       setLoading(false);
     }
