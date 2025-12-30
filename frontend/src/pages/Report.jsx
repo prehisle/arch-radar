@@ -155,7 +155,7 @@ const Report = () => {
   return (
     <PageLayout>
       <Helmet>
-        <title>测评报告 - {isPass ? '通过' : '未通过'} - {report.score}分 - 智能测评系统</title>
+        <title>{`测评报告 - ${isPass ? '通过' : '未通过'} - ${report.score}分 - 智能测评系统`}</title>
         <meta name="description" content={`本次测评得分${report.score}分。查看详细的知识点分析和AI备考建议。涵盖系统架构设计师、信息系统项目管理师等软考高级科目。`} />
         <meta name="keywords" content="软考高级测评报告, 智能备考分析, 软考成绩预测, 系统架构设计师真题解析, 信息系统项目管理师备考建议" />
       </Helmet>
