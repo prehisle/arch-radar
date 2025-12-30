@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, Database, Settings, Trash2, Edit2, Search, Save, X, FileText, LayoutDashboard, LogOut } from 'lucide-react';
+import { Upload, Database, Settings, Trash2, Edit2, Search, Save, X, FileText, LayoutDashboard, LogOut, Filter } from 'lucide-react';
 import axios from 'axios';
 import { buildApiUrl } from '../utils/apiBase';
 import Dashboard from '../components/Dashboard';
 import {
   uploadAdminFile, getAdminData, deleteAdminData, updateAdminData,
-  getAIConfig, updateAIConfig
+  getAIConfig, updateAIConfig, getSubjects
 } from '../api';
 
 const ADMIN_PATH = import.meta.env.VITE_ADMIN_PATH || '/admin-secret';
@@ -15,6 +15,16 @@ const Admin = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [message, setMessage] = useState('');
+  const [subjects, setSubjects] = useState([]);
+  const [currentSubject, setCurrentSubject] = useState(null);
+
+  useEffect(() => {
+    // Load subjects
+    getSubjects().then(data => {
+        setSubjects(data);
+        if (data.length > 0) setCurrentSubject(data[0]);
+    }).catch(e => console.error("Failed to load subjects", e));
+  }, []);
 
   const showMessage = (msg, type = 'success') => {
     setMessage({ text: msg, type });
@@ -44,7 +54,29 @@ const Admin = () => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">后台管理系统</h1>
+            <div className="flex items-center gap-4">
+                <h1 className="text-3xl font-bold text-gray-900">后台管理系统</h1>
+                {/* Global Subject Selector */}
+                {subjects.length > 0 && (
+                    <div className="relative">
+                        <select 
+                            className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-[#00838f] font-medium"
+                            value={currentSubject?.id || ''}
+                            onChange={(e) => {
+                                const sub = subjects.find(s => s.id === parseInt(e.target.value));
+                                setCurrentSubject(sub);
+                            }}
+                        >
+                            {subjects.map(sub => (
+                                <option key={sub.id} value={sub.id}>{sub.name}</option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                        </div>
+                    </div>
+                )}
+            </div>
             <button 
                 onClick={handleLogout}
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -91,10 +123,10 @@ const Admin = () => {
 
         {/* Content */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-h-[500px] p-6">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'upload' && <UploadSection showMessage={showMessage} />}
-          {activeTab === 'data' && <DataManagementSection showMessage={showMessage} />}
-          {activeTab === 'ai' && <AIConfigSection showMessage={showMessage} />}
+          {activeTab === 'dashboard' && <Dashboard subjectId={currentSubject?.id} />}
+          {activeTab === 'upload' && <UploadSection showMessage={showMessage} subjectId={currentSubject?.id} />}
+          {activeTab === 'data' && <DataManagementSection showMessage={showMessage} subjectId={currentSubject?.id} />}
+          {activeTab === 'ai' && <AIConfigSection showMessage={showMessage} subjectId={currentSubject?.id} />}
         </div>
       </div>
     </div>
@@ -116,7 +148,7 @@ const TabButton = ({ active, onClick, icon, label }) => (
 );
 
 // --- 1. Upload Section ---
-const UploadSection = ({ showMessage }) => {
+const UploadSection = ({ showMessage, subjectId }) => {
   const [loading, setLoading] = useState(false);
 
   const handleUpload = async (endpoint, file, extraParams = {}) => {
@@ -124,10 +156,16 @@ const UploadSection = ({ showMessage }) => {
       showMessage("请选择文件", "error");
       return;
     }
+    if (!subjectId) {
+        showMessage("请选择科目", "error");
+        return;
+    }
 
     setLoading(true);
     try {
-      const res = await uploadAdminFile(endpoint, file, extraParams);
+      // Pass subject_id
+      const params = { ...extraParams, subject_id: subjectId };
+      const res = await uploadAdminFile(endpoint, file, params);
       showMessage(res.message);
     } catch (err) {
       showMessage("上传失败: " + (err.response?.data?.detail || err.message), "error");
@@ -222,7 +260,7 @@ const UploadCard = ({ title, desc, accept, onUpload, loading, color, icon }) => 
 };
 
 // --- 2. Data Management Section ---
-const DataManagementSection = ({ showMessage }) => {
+const DataManagementSection = ({ showMessage, subjectId }) => {
     const [subTab, setSubTab] = useState('kps'); // 'kps' or 'questions'
     const [data, setData] = useState([]);
     const [total, setTotal] = useState(0);
@@ -232,11 +270,11 @@ const DataManagementSection = ({ showMessage }) => {
 
     useEffect(() => {
         fetchData();
-    }, [subTab, page, search]); // Re-fetch on change
+    }, [subTab, page, search, subjectId]); // Re-fetch on change
 
     const fetchData = async () => {
         try {
-            const res = await getAdminData(subTab, page, 20, search);
+            const res = await getAdminData(subTab, page, 20, search, subjectId);
             setData(res.data);
             setTotal(res.total);
         } catch (e) {
@@ -293,7 +331,7 @@ const DataManagementSection = ({ showMessage }) => {
                         type="text"
                         placeholder="搜索..."
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        onChange={(e) => { setSearch(e.target.value); setPage(0); }}
                         className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                 </div>
@@ -461,6 +499,16 @@ const EditForm = ({ item, type, onSave }) => {
                         <textarea name="content" value={formData.content} onChange={handleChange} rows={4} className="w-full border p-2 rounded" />
                     </div>
                     <div>
+                        <label className="block text-sm font-medium text-gray-700">选项 (每行一个，例如 "A. 选项内容")</label>
+                        <textarea 
+                            name="options" 
+                            value={Array.isArray(formData.options) ? formData.options.join('\n') : formData.options || ''} 
+                            onChange={(e) => setFormData({ ...formData, options: e.target.value.split('\n') })} 
+                            rows={4} 
+                            className="w-full border p-2 rounded" 
+                        />
+                    </div>
+                    <div>
                         <label className="block text-sm font-medium text-gray-700">答案</label>
                         <select name="answer" value={formData.answer} onChange={handleChange} className="w-full border p-2 rounded">
                             <option>A</option>
@@ -503,13 +551,13 @@ const EditForm = ({ item, type, onSave }) => {
 };
 
 // --- 3. AI Config Section ---
-const AIConfigSection = ({ showMessage }) => {
+const AIConfigSection = ({ showMessage, subjectId }) => {
     const [config, setConfig] = useState({});
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         loadConfig();
-    }, []);
+    }, [subjectId]); // Reload if subject changes? Usually global, but just in case we add subject-specific configs later.
 
     const loadConfig = async () => {
         try {

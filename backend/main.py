@@ -10,7 +10,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from backend.database import get_session, create_db_and_tables, redis_client
-from backend.models import Question, ExamSession, KnowledgePoint, AIConfig, MajorChapter, AILog
+from backend.models import Question, ExamSession, KnowledgePoint, AIConfig, MajorChapter, AILog, Subject
+from pydantic import BaseModel
 from backend.parsers import parse_weight_table, parse_questions, parse_syllabus
 from backend.config import settings
 from backend.ai_service import generate_variant_questions
@@ -67,36 +68,37 @@ def on_startup():
         
         # Auto-link KnowledgePoints to MajorChapters
         # 1. Fetch all MajorChapters
-        mcs = session.exec(select(MajorChapter)).all()
+        # DISABLED: This logic causes incorrect linking for multi-subject environment.
+        # mcs = session.exec(select(MajorChapter)).all()
         # Create map: Order (Index+1) -> MajorChapter ID
-        mc_order_map = {mc.order: mc.id for mc in mcs}
+        # mc_order_map = {mc.order: mc.id for mc in mcs}
         
         # 2. Fetch all KnowledgePoints
-        kps = session.exec(select(KnowledgePoint)).all()
-        count_linked = 0
+        # kps = session.exec(select(KnowledgePoint)).all()
+        # count_linked = 0
         
-        for kp in kps:
-            if not kp.chapter: continue
-            # Extract Chapter Number from string like "1. Computer System" or "1.1 xxx"
-            # We assume the first number before dot is the chapter index
-            try:
-                # E.g. "1. 计算机系统" -> 1
-                # E.g. "10. 未来信息" -> 10
-                import re
-                match = re.match(r'^(\d+)', kp.chapter.strip())
-                if match:
-                    chapter_num = int(match.group(1))
-                    if chapter_num in mc_order_map:
-                        if kp.major_chapter_id != mc_order_map[chapter_num]:
-                            kp.major_chapter_id = mc_order_map[chapter_num]
-                            session.add(kp)
-                            count_linked += 1
-            except Exception as e:
-                print(f"Error linking KP {kp.name}: {e}")
+        # for kp in kps:
+        #     if not kp.chapter: continue
+        #     # Extract Chapter Number from string like "1. Computer System" or "1.1 xxx"
+        #     # We assume the first number before dot is the chapter index
+        #     try:
+        #         # E.g. "1. 计算机系统" -> 1
+        #         # E.g. "10. 未来信息" -> 10
+        #         import re
+        #         match = re.match(r'^(\d+)', kp.chapter.strip())
+        #         if match:
+        #             chapter_num = int(match.group(1))
+        #             if chapter_num in mc_order_map:
+        #                 if kp.major_chapter_id != mc_order_map[chapter_num]:
+        #                     kp.major_chapter_id = mc_order_map[chapter_num]
+        #                     session.add(kp)
+        #                     count_linked += 1
+        #     except Exception as e:
+        #         print(f"Error linking KP {kp.name}: {e}")
                 
-        if count_linked > 0:
-            session.commit()
-            print(f"Linked {count_linked} KnowledgePoints to MajorChapters.")
+        # if count_linked > 0:
+        #     session.commit()
+        #     print(f"Linked {count_linked} KnowledgePoints to MajorChapters.")
 
         # Ensure default admin account exists
         ensure_default_admin(session)
@@ -106,11 +108,19 @@ def on_startup():
 # -----------------------------------------------------------------------------
 
 @app.post("/api/admin/upload/syllabus")
-async def upload_syllabus(file: UploadFile = File(...), db: Session = Depends(get_session)):
+async def upload_syllabus(
+    file: UploadFile = File(...), 
+    subject_id: int = Query(1),
+    db: Session = Depends(get_session)
+):
     content = (await file.read()).decode("utf-8")
     items = parse_syllabus(content)
     
     count = 0
+    
+    # Pre-fetch existing major chapters for this subject
+    # Or we just create them on fly if not exist? 
+    # Current KP model links to MajorChapter. MajorChapter links to Subject.
     
     for item in items:
         # Only process points
@@ -118,9 +128,60 @@ async def upload_syllabus(file: UploadFile = File(...), db: Session = Depends(ge
             continue
             
         name = item['name']
+        chapter_name = item.get('chapter', '')
         
-        # Check if exists
-        existing = db.exec(select(KnowledgePoint).where(KnowledgePoint.name == name)).first()
+        # 1. Ensure Major Chapter exists for this subject
+        # We need to extract chapter name from string like "1. Computer System" -> "Computer System"? 
+        # Or just use the whole string? 
+        # Actually MajorChapter table has `name` which is usually the chapter title.
+        # But `item['chapter']` is usually "1. ChapterName".
+        
+        # Strategy: Use fuzzy match or just create if not exists?
+        # Let's try to match existing MajorChapters in this subject first.
+        
+        # But wait, `item['chapter']` is stored in KP.chapter for display.
+        # KP.major_chapter_id is the foreign key.
+        # We need to find the MajorChapter ID.
+        
+        # Simple logic: If chapter name provided, try to find a MajorChapter that matches part of it.
+        mc_id = None
+        if chapter_name:
+             # Try to find existing MC in this subject
+             # Extract number?
+             import re
+             match = re.match(r'^(\d+)', chapter_name.strip())
+             if match:
+                 order = int(match.group(1))
+                 # Find MC by order in this subject
+                 mc = db.exec(select(MajorChapter).where(
+                     MajorChapter.subject_id == subject_id,
+                     MajorChapter.order == order
+                 )).first()
+                 if mc:
+                     mc_id = mc.id
+                 else:
+                     # Create new Major Chapter? 
+                     # Usually MCs are predefined, but for new subjects we might need to auto-create.
+                     # Let's create it.
+                     clean_name = re.sub(r'^\d+\.?\s*', '', chapter_name).strip()
+                     mc = MajorChapter(name=clean_name, order=order, subject_id=subject_id)
+                     db.add(mc)
+                     db.commit()
+                     db.refresh(mc)
+                     mc_id = mc.id
+        
+        # Check if KP exists (by name AND subject context ideally, but KP name is unique-ish? No, not unique in DB model but indexed)
+        # We should check if KP exists under this subject (via MC).
+        
+        # Complex query: KP name == name AND KP.major_chapter.subject_id == subject_id
+        # Easier: just check name. If duplicate names across subjects are allowed?
+        # Current model: name is index=True, not unique.
+        
+        query = select(KnowledgePoint).join(MajorChapter).where(
+            KnowledgePoint.name == name,
+            MajorChapter.subject_id == subject_id
+        )
+        existing = db.exec(query).first()
         
         if existing:
             kp = existing
@@ -129,51 +190,110 @@ async def upload_syllabus(file: UploadFile = File(...), db: Session = Depends(ge
                 kp.chapter = item['chapter']
             if item.get('description'):
                 kp.description = item['description']
+            if mc_id:
+                kp.major_chapter_id = mc_id
             db.add(kp)
         else:
             kp = KnowledgePoint(
                 name=name,
                 chapter=item.get('chapter', ''),
                 description=item.get('description', ''),
-                k_type='point'
+                k_type='point',
+                major_chapter_id=mc_id
             )
             db.add(kp)
             
         count += 1
         
     db.commit()
-    return {"message": f"Processed {count} syllabus knowledge points"}
+    return {"message": f"Processed {count} syllabus knowledge points for Subject {subject_id}"}
 
 @app.post("/api/admin/upload/weights")
-async def upload_weights(file: UploadFile = File(...), db: Session = Depends(get_session)):
+async def upload_weights(
+    file: UploadFile = File(...), 
+    subject_id: int = Query(1),
+    db: Session = Depends(get_session)
+):
     content = (await file.read()).decode("utf-8")
     data = parse_weight_table(content)
     
     count = 0
     for item in data:
-        # Check if KP exists
-        kp = db.exec(select(KnowledgePoint).where(KnowledgePoint.name == item['name'])).first()
+        # Determine names based on mode
+        if 'sub_chapter' in item:
+            # High-level PM mode
+            sub_chap = item.pop('sub_chapter', '').strip()
+            chap = item.get('chapter', '').strip()
+            name = item.get('name', '').strip()
+            
+            # Merged Name: Chapter-SubChapter-Name
+            # Remove all spaces from the components before merging (as requested)
+            # Example: "1. 信息化 发展" -> "1.信息化发展"
+            # User requirement: "去掉中间的空格".
+            # Use regex to remove ALL whitespace characters (including \xa0, \t, etc.)
+            import re
+            
+            sub_chap_clean = re.sub(r'\s+', '', sub_chap)
+            chap_clean = re.sub(r'\s+', '', chap)
+            name_clean = re.sub(r'\s+', '', name)
+            
+            kp_name = f"{chap_clean}-{sub_chap_clean}-{name_clean}"
+            # Display Chapter: Chapter-SubChapter
+            kp_chapter_display = f"{chap_clean}-{sub_chap_clean}"
+            
+            # Update item for DB creation
+            item['name'] = kp_name
+            item['chapter'] = kp_chapter_display
+        else:
+            # Standard mode
+            kp_name = item['name']
+            # kp_chapter_display = item['chapter'] (already in item)
+
+        # Check if KP exists in this subject
+        query = select(KnowledgePoint).join(MajorChapter).where(
+            KnowledgePoint.name == kp_name,
+            MajorChapter.subject_id == subject_id
+        )
+        kp = db.exec(query).first()
+        
+        # Determine Major Chapter ID (needed for update or create)
+        mc_id = None
+        if item.get('chapter'):
+            import re
+            # Match "1. xxx" or "1 xxx" at start of the chapter string (which might be "1. Info - 1.1 Sub")
+            match = re.match(r'^(\d+)', item['chapter'].strip())
+            if match:
+                order = int(match.group(1))
+                mc = db.exec(select(MajorChapter).where(
+                    MajorChapter.subject_id == subject_id,
+                    MajorChapter.order == order
+                )).first()
+                if mc: mc_id = mc.id
+
         if kp:
             # Update weight
             kp.weight_level = item['weight_level']
             kp.weight_score = item['weight_score']
             kp.frequency = item.get('frequency', 0)
             kp.analysis = item.get('analysis')
-            # kp.description = item.get('description') # Weight table no longer has description, it has analysis
+            # Also update MajorChapter if missing or different (though usually fixed by order)
+            if mc_id and kp.major_chapter_id != mc_id:
+                kp.major_chapter_id = mc_id
             db.add(kp)
         else:
-            # Create new (flat, as we don't have parent info from weight table usually, unless we infer from Chapter)
-            # The parser extracts Chapter.
+            # Create new
             kp = KnowledgePoint(**item)
+            kp.major_chapter_id = mc_id
             db.add(kp)
         count += 1
     
     db.commit()
-    return {"message": f"Updated/Created {count} knowledge points from weights"}
+    return {"message": f"Updated/Created {count} knowledge points from weights for Subject {subject_id}"}
 
 @app.post("/api/admin/upload/questions")
 async def upload_questions(
     source_type: str = Query(..., description="past_paper or exercise"),
+    subject_id: int = Query(1),
     file: UploadFile = File(...), 
     db: Session = Depends(get_session)
 ):
@@ -200,11 +320,27 @@ async def upload_questions(
             # We should try to find an exact match first, then fuzzy
             kp_name = kp_raw.strip()
             
-            # Exact match
-            kp = db.exec(select(KnowledgePoint).where(KnowledgePoint.name == kp_name)).first()
+            # Special handling for PM subject (Subject 2)
+            # Remove all spaces from the query name because we stored it without spaces
+            if subject_id == 2:
+                import re
+                kp_name = re.sub(r'\s+', '', kp_name)
+            
+            # Exact match IN THIS SUBJECT
+            query = select(KnowledgePoint).join(MajorChapter).where(
+                KnowledgePoint.name == kp_name,
+                MajorChapter.subject_id == subject_id
+            )
+            kp = db.exec(query).first()
+            
             if not kp:
                  # Fallback: Try contains if exact match fails
-                 kp = db.exec(select(KnowledgePoint).where(KnowledgePoint.name.contains(kp_name))).first()
+                 # But strict on subject
+                 query_fuzzy = select(KnowledgePoint).join(MajorChapter).where(
+                     KnowledgePoint.name.contains(kp_name),
+                     MajorChapter.subject_id == subject_id
+                 )
+                 kp = db.exec(query_fuzzy).first()
             
             if kp:
                 kp_id = kp.id
@@ -214,7 +350,7 @@ async def upload_questions(
         count += 1
         
     db.commit()
-    return {"message": f"Uploaded {count} questions for {db_source_type}"}
+    return {"message": f"Uploaded {count} questions for {db_source_type} (Subject {subject_id})"}
 
 # --- CRUD APIs for Data Management ---
 
@@ -223,9 +359,13 @@ def get_kps(
     skip: int = 0, 
     limit: int = 100, 
     search: Optional[str] = None,
+    subject_id: Optional[int] = None,
     db: Session = Depends(get_session)
 ):
     query = select(KnowledgePoint)
+    if subject_id:
+        query = query.join(MajorChapter).where(MajorChapter.subject_id == subject_id)
+        
     if search:
         query = query.where(KnowledgePoint.name.contains(search))
     
@@ -263,9 +403,14 @@ def get_questions(
     limit: int = 50, 
     source_type: Optional[str] = None,
     search: Optional[str] = None,
+    subject_id: Optional[int] = None,
     db: Session = Depends(get_session)
 ):
     query = select(Question).options(selectinload(Question.knowledge_point))
+    if subject_id:
+        # Join KP -> MC to filter by subject
+        query = query.join(KnowledgePoint).join(MajorChapter).where(MajorChapter.subject_id == subject_id)
+
     if source_type:
         query = query.where(Question.source_type == source_type)
     if search:
@@ -358,8 +503,14 @@ def get_exam_session(
     time_diff = (datetime.utcnow() - session.start_time).total_seconds()
     duration_left = max(0, int(9000 - time_diff))
     
+    subject_name = ""
+    if session.subject_id:
+        sub = db.get(Subject, session.subject_id)
+        if sub: subject_name = sub.name
+
     return {
         "session_id": session.id,
+        "subject_name": subject_name,
         "status": "resumed",
         "start_time": session.start_time.isoformat(),
         "duration_left": duration_left,
@@ -378,16 +529,20 @@ def get_user_question_history(fingerprint: str) -> List[int]:
         print(f"Redis History Fetch Error: {e}")
         return []
 
-def get_user_kp_error_rates(db: Session, fingerprint: str) -> Dict[int, float]:
+def get_user_kp_error_rates(db: Session, fingerprint: str, subject_id: Optional[int] = None) -> Dict[int, float]:
     """
     Calculate error rates for each KP based on user's past sessions.
     Returns: {kp_id: error_rate} (0.0 to 1.0)
     """
     # 1. Fetch user's submitted sessions
-    sessions = db.exec(select(ExamSession).where(
+    query = select(ExamSession).where(
         ExamSession.user_fingerprint == fingerprint,
         ExamSession.is_submitted == True
-    ).order_by(desc(ExamSession.start_time)).limit(20)).all()
+    )
+    if subject_id:
+        query = query.where(ExamSession.subject_id == subject_id)
+        
+    sessions = db.exec(query.order_by(desc(ExamSession.start_time)).limit(20)).all()
     
     if not sessions: return {}
     
@@ -447,12 +602,23 @@ def update_user_question_history(fingerprint: str, q_ids: List[int]):
     except Exception as e:
         print(f"Redis History Update Error: {e}")
 
+@app.get("/api/subjects")
+def get_subjects(db: Session = Depends(get_session)):
+    return db.exec(select(Subject)).all()
+
+class StartExamRequest(BaseModel):
+    user_fingerprint: str
+    subject_id: Optional[int] = 1
+
 @app.post("/api/exam/start")
 def start_exam(
     request: Request,
-    user_fingerprint: str = Body(..., embed=True), 
+    body: StartExamRequest,
     db: Session = Depends(get_session)
 ):
+    user_fingerprint = body.user_fingerprint
+    subject_id = body.subject_id
+    
     # Capture Info
     # Handle Proxy Headers for Real IP
     forwarded_for = request.headers.get("x-forwarded-for")
@@ -480,6 +646,24 @@ def start_exam(
     # Debug Logging
     print(f"DEBUG: IP={ip}, UA={user_agent}, Device={device}")
 
+    # Rate Limiting
+    rate_key = f"rate_limit:start_exam:{ip}"
+    try:
+        current_rate = redis_client.incr(rate_key)
+        if current_rate == 1:
+            redis_client.expire(rate_key, 60)
+        if current_rate > 10:
+             raise HTTPException(429, "Too many requests. Please try again later.")
+    except Exception as e:
+        print(f"Redis Rate Limit Error: {e}")
+
+    # Security: Referer Check
+    referer = request.headers.get("referer")
+    if referer:
+        allowed_domains = ["localhost", "127.0.0.1", "yuejxt.cn", "sealos.run"]
+        if not any(d in referer for d in allowed_domains):
+            print(f"WARNING: Suspicious Referer: {referer}")
+
     # Location Detection
     location = "Unknown"
     # Check for private IP ranges (Local LAN)
@@ -501,7 +685,7 @@ def start_exam(
 
 
     # 1. Check Redis Cache first (3.2.2 Session Persistence)
-    cache_key = f"exam_session:{user_fingerprint}"
+    cache_key = f"exam_session:{user_fingerprint}:{subject_id}"
     try:
         cached_data = redis_client.get(cache_key)
         if cached_data:
@@ -524,6 +708,7 @@ def start_exam(
     # 2. Check active session in DB (Fallback / Long term)
     existing = db.exec(select(ExamSession).where(
         ExamSession.user_fingerprint == user_fingerprint,
+        ExamSession.subject_id == subject_id,
         ExamSession.is_submitted == False
     )).first()
     
@@ -563,7 +748,7 @@ def start_exam(
     # 3. Generate New Exam
     
     # Lock to prevent double generation
-    lock_key = f"exam_gen_lock:{user_fingerprint}"
+    lock_key = f"exam_gen_lock:{user_fingerprint}:{subject_id}"
     if not redis_client.set(lock_key, "1", nx=True, ex=30):
         # Already generating
         print(f"DEBUG: Concurrent generation detected for {user_fingerprint}")
@@ -590,22 +775,30 @@ def start_exam(
     # Target: 75 Qs. 
     # 30% Past (22), 50% Exercise (38), 20% AI (15)
     
+    def get_qs_query(source_type):
+        return select(Question).join(KnowledgePoint).join(MajorChapter).where(
+            MajorChapter.subject_id == subject_id,
+            Question.source_type == source_type
+        )
+
     # We use "历年真题" and "章节练习" as source_type now, mapped from upload
-    q_past = db.exec(select(Question).where(Question.source_type == "历年真题")).all()
-    q_exercise = db.exec(select(Question).where(Question.source_type == "章节练习")).all()
-    q_ai = db.exec(select(Question).where(Question.source_type == "ai_generated")).all()
+    q_past = db.exec(get_qs_query("历年真题")).all()
+    q_exercise = db.exec(get_qs_query("章节练习")).all()
+    q_ai = db.exec(get_qs_query("ai_generated")).all()
     
     # If no data found with Chinese types, try fallback to English types (legacy support)
     if not q_past:
-        q_past = db.exec(select(Question).where(Question.source_type == "past_paper")).all()
+        q_past = db.exec(get_qs_query("past_paper")).all()
     if not q_exercise:
-        q_exercise = db.exec(select(Question).where(Question.source_type == "exercise")).all()
+        q_exercise = db.exec(get_qs_query("exercise")).all()
     
     # Pre-fetch KP weights for weighted sampling
-    # We fetch ID and Score
-    kps = db.exec(select(KnowledgePoint.id, KnowledgePoint.weight_score)).all()
+    # We fetch ID and Score, filtered by Subject via MajorChapter
+    kps = db.exec(select(KnowledgePoint.id, KnowledgePoint.weight_score)
+                  .join(MajorChapter)
+                  .where(MajorChapter.subject_id == subject_id)).all()
     # Optimization 1: User Error Rate Weighting
-    user_error_rates = get_user_kp_error_rates(db, user_fingerprint)
+    user_error_rates = get_user_kp_error_rates(db, user_fingerprint, subject_id)
     
     kp_weights = {}
     for kp_id, score in kps:
@@ -651,8 +844,9 @@ def start_exam(
     selected = []
     
     # 1. Select 5 "Low Weight" questions (General/Cold/Not Syllabus)
-    # Fetch candidate questions via join
-    q_low_weight = db.exec(select(Question).join(KnowledgePoint).where(
+    # Fetch candidate questions via join, filtered by Subject
+    q_low_weight = db.exec(select(Question).join(KnowledgePoint).join(MajorChapter).where(
+        MajorChapter.subject_id == subject_id,
         KnowledgePoint.weight_level.in_(["一般", "冷门", "非考纲要求"])
     )).all()
     
@@ -740,10 +934,14 @@ def start_exam(
                 api_conf = db.exec(select(AIConfig).where(AIConfig.config_key == "gemini_api_key")).first()
                 api_key = api_conf.value if api_conf else settings.GEMINI_API_KEY
 
+            # Get Subject Name for Prompt
+            subject_obj = db.get(Subject, subject_id)
+            subject_name = subject_obj.name if subject_obj else "系统架构设计师"
+
             start_ts = time.time()
             
             # Batch generate: Pass all seeds at once (No batching needed for small N=3)
-            generated_all = generate_variant_questions(all_seeds_data, 1, api_key=api_key)
+            generated_all = generate_variant_questions(all_seeds_data, 1, api_key=api_key, subject_name=subject_name)
             
             duration = time.time() - start_ts
             db.add(AILog(call_type="smart_paper", status="success", response_time=duration))
@@ -830,6 +1028,7 @@ def start_exam(
     
     session = ExamSession(
         user_fingerprint=user_fingerprint,
+        subject_id=subject_id,
         question_ids=q_ids,
         ip_address=ip,
         device_info=device,
@@ -1011,8 +1210,14 @@ def submit_exam(
         # Fetch historical rates for context
         history_rates = get_user_kp_error_rates(db, session.user_fingerprint)
         
+        # Get subject name
+        subject_name = "系统架构设计师"
+        if session.subject_id:
+             sub_obj = db.get(Subject, session.subject_id)
+             if sub_obj: subject_name = sub_obj.name
+
         start_ts = time.time()
-        report = generate_report(final_score, kp_stats, prompt_template, api_key=api_key, duration_minutes=duration_minutes, history_rates=history_rates)
+        report = generate_report(final_score, kp_stats, prompt_template, api_key=api_key, duration_minutes=duration_minutes, history_rates=history_rates, subject_name=subject_name)
         duration = time.time() - start_ts
         db.add(AILog(call_type="report", status="success", response_time=duration))
         
@@ -1023,15 +1228,15 @@ def submit_exam(
             # Actually if it returns a dict with error, it technically succeeded in calling, but failed in content.
             # Let's count it as success in invocation, but maybe we want to know.
             # For now, keep it simple.
-            report = generate_ai_report_mock(final_score, kp_stats, db)
+            report = generate_ai_report_mock(final_score, kp_stats, db, subject_id=session.subject_id)
         else:
             # Inject radar data if AI succeeded
-            report["radar_data"] = calculate_radar_data(kp_stats, db)
+            report["radar_data"] = calculate_radar_data(kp_stats, db, subject_id=session.subject_id)
     except Exception as e:
         duration = time.time() - start_ts
         db.add(AILog(call_type="report", status="failure", response_time=duration, error_message=str(e)))
         print(f"AI Service Exception: {e}")
-        report = generate_ai_report_mock(final_score, kp_stats, db)
+        report = generate_ai_report_mock(final_score, kp_stats, db, subject_id=session.subject_id)
 
     # Inject basic stats (accuracy, duration)
     report["score"] = final_score
@@ -1044,12 +1249,14 @@ def submit_exam(
     session.is_submitted = True
     session.end_time = final_end_time
     session.ai_report = report
+    session.ai_report_generated = True
     
     db.add(session)
     db.commit()
     
     # Clear Redis Cache (3.2.2)
     try:
+        redis_client.delete(f"exam_session:{session.user_fingerprint}:{session.subject_id}")
         redis_client.delete(f"exam_session:{session.user_fingerprint}")
         print(f"DEBUG: Cleared cache for {session.user_fingerprint}")
     except Exception as e:
@@ -1088,8 +1295,14 @@ def get_share_content(
         return session.ai_report["share_content"]
     
     try:
+        # Get subject name
+        subject_name = "系统架构设计师"
+        if session.subject_id:
+             sub_obj = db.get(Subject, session.subject_id)
+             if sub_obj: subject_name = sub_obj.name
+
         start_ts = time.time()
-        share_content = generate_share_content(session.ai_report, prompt_template, api_key=api_key)
+        share_content = generate_share_content(session.ai_report, prompt_template, api_key=api_key, subject_name=subject_name)
         duration = time.time() - start_ts
         db.add(AILog(call_type="social_analysis", status="success", response_time=duration))
         
@@ -1108,13 +1321,14 @@ def get_share_content(
         db.commit()
         raise HTTPException(500, f"AI generation failed: {str(e)}")
 
-def calculate_radar_data(kp_stats, db):
+def calculate_radar_data(kp_stats, db, subject_id: int = 1):
     # Fetch KP details
     kps = db.exec(select(KnowledgePoint).where(KnowledgePoint.id.in_(kp_stats.keys()))).all()
     kp_map = {kp.id: kp for kp in kps}
     
     # Major Chapter stats aggregation
-    major_chapters = db.exec(select(MajorChapter)).all()
+    # Filter Major Chapters by Subject
+    major_chapters = db.exec(select(MajorChapter).where(MajorChapter.subject_id == subject_id)).all()
     mc_map = {mc.id: {"name": mc.name, "correct": 0, "total": 0, "order": mc.order} for mc in major_chapters}
     
     for kpid, stats in kp_stats.items():
@@ -1156,7 +1370,7 @@ def calculate_radar_data(kp_stats, db):
             
     return radar_data
 
-def generate_ai_report_mock(score, kp_stats, db):
+def generate_ai_report_mock(score, kp_stats, db, subject_id: int = 1):
     # Fetch KP details
     kps = db.exec(select(KnowledgePoint).where(KnowledgePoint.id.in_(kp_stats.keys()))).all()
     kp_map = {kp.id: kp for kp in kps}
@@ -1174,7 +1388,7 @@ def generate_ai_report_mock(score, kp_stats, db):
         else:
             strengths.append(f"{kp.name}")
             
-    radar_data = calculate_radar_data(kp_stats, db)
+    radar_data = calculate_radar_data(kp_stats, db, subject_id=subject_id)
         
     # Learning Path
     path = []
@@ -1183,11 +1397,22 @@ def generate_ai_report_mock(score, kp_stats, db):
     else:
         path = ["继续保持，多做真题巩固。"]
     
-    level = "初级架构师"
+    level_suffix = "架构师"
+    if subject_id:
+        sub = db.get(Subject, subject_id)
+        if sub and "项目" in sub.name:
+             level_suffix = "项目经理"
+        elif sub:
+             # Try to simplify name: "系统分析师" -> "分析师"
+             if "分析师" in sub.name: level_suffix = "分析师"
+             elif "规划师" in sub.name: level_suffix = "规划师"
+             else: level_suffix = sub.name
+
+    level = f"初级{level_suffix}"
     if score >= 45:
-        level = "高级架构师"
+        level = f"高级{level_suffix}"
     elif score >= 30:
-        level = "准高级架构师"
+        level = f"准高级{level_suffix}"
         
     return {
         "score": score,
@@ -1224,7 +1449,13 @@ async def get_report_pdf(session_id: str, db: Session = Depends(get_session)):
     # However, the frontend receives { ai_report: ..., questions: ... } structure from somewhere else?
     # Ah, let's check get_report endpoint.
     
-    pdf_bytes = create_pdf_report({"ai_report": session.ai_report}, session_id)
+    # Get subject name
+    subject_name = "系统架构设计师"
+    if session.subject_id:
+        sub_obj = db.get(Subject, session.subject_id)
+        if sub_obj: subject_name = sub_obj.name
+
+    pdf_bytes = create_pdf_report({"ai_report": session.ai_report}, session_id, subject_name=subject_name)
     
     return Response(
         content=pdf_bytes,
@@ -1259,9 +1490,15 @@ def get_report(session_id: str, db: Session = Depends(get_session)):
                 "user_answer": session.user_answers.get(str(qid))
             })
 
+    subject_name = ""
+    if session.subject_id:
+        sub = db.get(Subject, session.subject_id)
+        if sub: subject_name = sub.name
+
     return {
         "ai_report": session.ai_report,
-        "questions": detail_questions
+        "questions": detail_questions,
+        "subject_name": subject_name
     }
 
 # -----------------------------------------------------------------------------
@@ -1272,11 +1509,16 @@ def get_report(session_id: str, db: Session = Depends(get_session)):
 def get_dashboard_users(
     skip: int = 0, 
     limit: int = 20, 
+    subject_id: Optional[int] = None,
     db: Session = Depends(get_session)
 ):
     # Fetch sessions with pagination directly
-    total = db.exec(select(func.count(ExamSession.id))).one()
-    sessions = db.exec(select(ExamSession).order_by(desc(ExamSession.start_time)).offset(skip).limit(limit)).all()
+    query = select(ExamSession)
+    if subject_id:
+        query = query.where(ExamSession.subject_id == subject_id)
+        
+    total = db.exec(select(func.count()).select_from(query.subquery())).one()
+    sessions = db.exec(query.order_by(desc(ExamSession.start_time)).offset(skip).limit(limit)).all()
     
     users_list = []
     for s in sessions:
@@ -1290,9 +1532,20 @@ def get_dashboard_users(
             level = s.ai_report.get("title", level)
         else:
             # Score-based estimation if no report
-            if score >= 45: level = "高级架构师"
-            elif score >= 30: level = "准高级架构师"
-            elif score > 0: level = "初级架构师"
+            level_suffix = "架构师"
+            if s.subject_id:
+                sub = db.get(Subject, s.subject_id)
+                if sub and "项目" in sub.name:
+                     level_suffix = "项目经理"
+                elif sub:
+                     # Try to simplify name
+                     if "分析师" in sub.name: level_suffix = "分析师"
+                     elif "规划师" in sub.name: level_suffix = "规划师"
+                     else: level_suffix = sub.name
+
+            if score >= 45: level = f"高级{level_suffix}"
+            elif score >= 30: level = f"准高级{level_suffix}"
+            elif score > 0: level = f"初级{level_suffix}"
         
         users_list.append({
             "fingerprint": s.user_fingerprint,
@@ -1310,25 +1563,55 @@ def get_dashboard_users(
     return {"total": total, "data": users_list}
 
 @app.get("/api/dashboard/materials")
-def get_material_stats(db: Session = Depends(get_session)):
+def get_material_stats(subject_id: Optional[int] = None, db: Session = Depends(get_session)):
     # Try cache
-    cache_key = "material_stats"
+    cache_key = f"material_stats:{subject_id}" if subject_id else "material_stats:all"
     cached = redis_client.get(cache_key)
     if cached:
         return json.loads(cached)
 
-    # Static Info
-    total_q = db.exec(select(func.count(Question.id))).one()
-    past_q = db.exec(select(func.count(Question.id)).where(Question.source_type.in_(["历年真题", "past_paper"]))).one()
-    exercise_q = db.exec(select(func.count(Question.id)).where(Question.source_type.in_(["章节练习", "exercise"]))).one()
-    ai_q = db.exec(select(func.count(Question.id)).where(Question.source_type == "ai_generated")).one()
+    # Base queries
+    q_query = select(func.count(Question.id))
+    kp_query = select(func.count(KnowledgePoint.id))
+    mc_query = select(func.count(MajorChapter.id))
+    
+    # If filtered by subject, we need to join tables
+    if subject_id:
+        # Questions -> KP -> MC -> Subject
+        q_query = q_query.join(KnowledgePoint).join(MajorChapter).where(MajorChapter.subject_id == subject_id)
+        # KP -> MC -> Subject
+        kp_query = kp_query.join(MajorChapter).where(MajorChapter.subject_id == subject_id)
+        # MC -> Subject
+        mc_query = mc_query.where(MajorChapter.subject_id == subject_id)
+        
+    total_q = db.exec(q_query).one()
+    
+    # Helper for question source type count with optional subject filter
+    def count_q_by_type(types):
+        query = select(func.count(Question.id))
+        if subject_id:
+            query = query.join(KnowledgePoint).join(MajorChapter).where(MajorChapter.subject_id == subject_id)
+        
+        if isinstance(types, list):
+            query = query.where(Question.source_type.in_(types))
+        else:
+            query = query.where(Question.source_type == types)
+        return db.exec(query).one()
+
+    past_q = count_q_by_type(["历年真题", "past_paper"])
+    exercise_q = count_q_by_type(["章节练习", "exercise"])
+    ai_q = count_q_by_type("ai_generated")
     
     # Static info: Chapters & KPs
-    chapters = db.exec(select(func.count(MajorChapter.id))).one()
-    kps = db.exec(select(func.count(KnowledgePoint.id))).one()
+    chapters = db.exec(mc_query).one()
+    kps = db.exec(kp_query).one()
     
     # Weight Distribution
-    weight_counts = db.exec(select(KnowledgePoint.weight_level, func.count(KnowledgePoint.id)).group_by(KnowledgePoint.weight_level)).all()
+    w_query = select(KnowledgePoint.weight_level, func.count(KnowledgePoint.id))
+    if subject_id:
+        w_query = w_query.join(MajorChapter).where(MajorChapter.subject_id == subject_id)
+    
+    weight_counts = db.exec(w_query.group_by(KnowledgePoint.weight_level)).all()
     weights = [{"name": w[0] or "未标注", "value": w[1]} for w in weight_counts]
 
     result = {

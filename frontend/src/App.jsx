@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Home from './pages/Home';
 import Exam from './pages/Exam';
 import Report from './pages/Report';
+import ComingSoon from './pages/ComingSoon';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import PrivateRoute from './components/PrivateRoute';
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/exam" element={<Exam />} />
         <Route path="/report/:sessionId" element={<Report />} />
+        <Route path="/coming-soon" element={<ComingSoon />} />
         
         {/* Admin Routes */}
         <Route path={`${ADMIN_PATH}/login`} element={<Login />} />

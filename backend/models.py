@@ -34,10 +34,18 @@ class KnowledgePoint(SQLModel, table=True):
     
     questions: List["Question"] = Relationship(back_populates="knowledge_point")
 
-class MajorChapter(SQLModel, table=True):
+class Subject(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
+    code: str = Field(unique=True, index=True)
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    icon_url: Optional[str] = None
+
+class MajorChapter(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True) # Removed unique=True
     order: int = Field(default=0)
+    subject_id: Optional[int] = Field(default=None, foreign_key="subject.id")
 
 
 class Question(SQLModel, table=True):
@@ -82,6 +90,9 @@ class ExamSession(SQLModel, table=True):
     is_submitted: bool = Field(default=False)
     score: Optional[int] = None
     
+    subject_id: Optional[int] = Field(default=None, foreign_key="subject.id")
+    ai_report_generated: bool = Field(default=False) # To prevent re-generation
+
     # Full AI Report
     ai_report: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
     

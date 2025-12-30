@@ -43,9 +43,17 @@ const getFingerprint = () => {
   return fp;
 };
 
-export const startExam = async () => {
+export const getSubjects = async () => {
+    const res = await api.get('/api/subjects');
+    return res.data;
+};
+
+export const startExam = async (subjectId = 1) => {
   const fp = getFingerprint();
-  const res = await api.post('/api/exam/start', { user_fingerprint: fp });
+  const res = await api.post('/api/exam/start', { 
+      user_fingerprint: fp,
+      subject_id: subjectId
+  });
   return res.data;
 };
 
@@ -116,8 +124,10 @@ export const downloadReportPDF = async (sessionId) => {
 
 // --- Dashboard APIs ---
 
-export const getDashboardUsers = async (limit = 20) => {
-  const res = await api.get('/api/dashboard/users', { params: { limit } });
+export const getDashboardUsers = async (limit = 20, subjectId = null) => {
+  const params = { limit };
+  if (subjectId) params.subject_id = subjectId;
+  const res = await api.get('/api/dashboard/users', { params });
   return res.data;
 };
 
@@ -126,8 +136,10 @@ export const getDashboardStats = async () => {
   return res.data;
 };
 
-export const getMaterialStats = async () => {
-  const res = await api.get('/api/dashboard/materials');
+export const getMaterialStats = async (subjectId = null) => {
+  const params = {};
+  if (subjectId) params.subject_id = subjectId;
+  const res = await api.get('/api/dashboard/materials', { params });
   return res.data;
 };
 
@@ -144,11 +156,11 @@ export const uploadAdminFile = async (endpoint, file, extraParams = {}) => {
   return res.data;
 };
 
-export const getAdminData = async (type, page = 0, limit = 20, search = '') => {
+export const getAdminData = async (type, page = 0, limit = 20, search = '', subjectId = null) => {
   const endpoint = type === 'kps' ? 'knowledge_points' : 'questions';
-  const res = await api.get(`/api/admin/${endpoint}`, {
-    params: { skip: page * limit, limit, search }
-  });
+  const params = { skip: page * limit, limit, search };
+  if (subjectId) params.subject_id = subjectId;
+  const res = await api.get(`/api/admin/${endpoint}`, { params });
   return res.data;
 };
 

@@ -48,7 +48,7 @@ if font_path:
 else:
     FONT_NAME = 'Helvetica' # Fallback
 
-def create_pdf_report(report_data: dict, session_id: str) -> bytes:
+def create_pdf_report(report_data: dict, session_id: str, subject_name: str = "系统架构设计师") -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                             rightMargin=20*mm, leftMargin=20*mm,
@@ -118,7 +118,7 @@ def create_pdf_report(report_data: dict, session_id: str) -> bytes:
     # --- Cover Page ---
     # Logo / Icon placeholder (Text for now)
     story.append(Spacer(1, 40*mm))
-    story.append(Paragraph("系统架构设计师", title_style))
+    story.append(Paragraph(subject_name, title_style))
     story.append(Paragraph("智能测评报告", title_style))
     story.append(Paragraph("SMART ASSESSMENT REPORT", subtitle_style))
     
@@ -165,15 +165,16 @@ def create_pdf_report(report_data: dict, session_id: str) -> bytes:
     duration = report_info.get('duration_minutes', 0)
     
     metrics_data = [
-        [f"{accuracy}%", f"{duration} 分", title],
+        [f"{accuracy}%", f"{duration} 分", Paragraph(title, normal_style)],
         ["正确率", "用时", "评级"]
     ]
     
-    t_metrics = Table(metrics_data, colWidths=[50*mm, 50*mm, 50*mm])
+    t_metrics = Table(metrics_data, colWidths=[40*mm, 40*mm, 90*mm])
     t_metrics.setStyle(TableStyle([
         ('FONTNAME', (0,0), (-1,-1), FONT_NAME),
         ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('FONTSIZE', (0,0), (-1,0), 20),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('FONTSIZE', (0,0), (1,0), 20),
         ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#00838f')),
         ('FONTSIZE', (0,1), (-1,1), 12),
         ('TEXTCOLOR', (0,1), (-1,1), colors.grey),

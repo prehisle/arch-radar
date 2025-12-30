@@ -13,6 +13,7 @@ import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
 import clsx from 'clsx';
 import PageLayout from '../components/PageLayout';
+import { Helmet } from 'react-helmet-async';
 
 const processContent = (text) => {
     if (!text) return "";
@@ -153,10 +154,20 @@ const Report = () => {
 
   return (
     <PageLayout>
+      <Helmet>
+        <title>测评报告 - {isPass ? '通过' : '未通过'} - {report.score}分 - 智能测评系统</title>
+        <meta name="description" content={`本次测评得分${report.score}分。查看详细的知识点分析和AI备考建议。涵盖系统架构设计师、信息系统项目管理师等软考高级科目。`} />
+        <meta name="keywords" content="软考高级测评报告, 智能备考分析, 软考成绩预测, 系统架构设计师真题解析, 信息系统项目管理师备考建议" />
+      </Helmet>
       <div className="space-y-8 pb-12" ref={reportRef}>
         {/* Header / Score Card */}
         <div className="glass-card p-5 md:p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center relative overflow-hidden">
           <div className="z-10 text-center md:text-left">
+            {data.subject_name && (
+               <div className="inline-block px-3 py-1 bg-[#00838f]/10 text-[#00838f] text-sm font-bold rounded-full mb-3 border border-[#00838f]/20">
+                   {data.subject_name}
+               </div>
+            )}
             <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#00838f] to-[#00acc1] mb-2">测评完成！</h1>
             <p className="text-[#546e7a] text-lg">您的当前评级：<span className="font-bold text-[#00838f] text-xl">{title}</span></p>
           </div>
@@ -191,8 +202,13 @@ const Report = () => {
              <h3 className="text-xl font-bold text-[#00695c] mb-4 flex items-center">
                <MessageSquare className="w-7 h-7 mr-2 text-[#00acc1]" /> AI 综合点评
              </h3>
-             <div className="prose max-w-none text-[#37474f] font-medium leading-loose bg-[#e0f7fa]/30 p-4 rounded-xl border border-[#b2ebf2]/50 whitespace-pre-wrap">
-               {report.evaluation.comment}
+             <div className="prose max-w-none text-[#37474f] font-medium leading-loose bg-[#e0f7fa]/30 p-4 rounded-xl border border-[#b2ebf2]/50">
+               <ReactMarkdown 
+                   remarkPlugins={[remarkGfm, remarkMath]} 
+                   rehypePlugins={[rehypeKatex, rehypeRaw]}
+               >
+                   {processContent(report.evaluation.comment)}
+               </ReactMarkdown>
              </div>
           </div>
         )}

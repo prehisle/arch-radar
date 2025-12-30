@@ -4,7 +4,7 @@ from typing import Dict, Any
 from backend.config import settings
 from openai import OpenAI
 
-def generate_report(score: int, kp_stats: Dict[str, Any], prompt_template: str, api_key: str = None, duration_minutes: int = 0, history_rates: Dict[int, float] = None) -> Dict[str, Any]:
+def generate_report(score: int, kp_stats: Dict[str, Any], prompt_template: str, api_key: str = None, duration_minutes: int = 0, history_rates: Dict[int, float] = None, subject_name: str = "系统架构设计师") -> Dict[str, Any]:
     """
     Generates an AI analysis report using Gemini or Qwen.
     """
@@ -61,12 +61,22 @@ def generate_report(score: int, kp_stats: Dict[str, Any], prompt_template: str, 
     score_gap = 45 - score
     gap_str = f"距离及格线（45分）还差 {score_gap} 分" if score_gap > 0 else f"已超过及格线 {abs(score_gap)} 分"
     
+    # Calculate level suffix
+    level_suffix = "架构师" # Default
+    if "项目" in subject_name: level_suffix = "项目经理"
+    elif "分析师" in subject_name: level_suffix = "分析师"
+    elif "规划师" in subject_name: level_suffix = "规划师"
+    elif "架构" in subject_name: level_suffix = "架构师"
+    elif subject_name: level_suffix = subject_name # Fallback to full name if unknown pattern
+
     prompt = prompt_template.format(
         score=score,
         accuracy=accuracy,
         duration_minutes=duration_minutes, 
         kp_analysis=kp_analysis_str,
-        gap_analysis=gap_str
+        gap_analysis=gap_str,
+        subject_name=subject_name,
+        level_suffix=level_suffix
     )
 
     if settings.AI_PROVIDER == "qwen":
@@ -74,7 +84,7 @@ def generate_report(score: int, kp_stats: Dict[str, Any], prompt_template: str, 
     else:
         return call_gemini(prompt, api_key=key)
 
-def generate_share_content(report_data: Dict[str, Any], prompt_template: str, api_key: str = None) -> Dict[str, Any]:
+def generate_share_content(report_data: Dict[str, Any], prompt_template: str, api_key: str = None, subject_name: str = "系统架构设计师") -> Dict[str, Any]:
     """
     Generates social share content using Gemini or Qwen.
     """
@@ -107,7 +117,8 @@ def generate_share_content(report_data: Dict[str, Any], prompt_template: str, ap
         level=level,
         score=score_str,
         percentile=percentile,
-        highlight=highlight
+        highlight=highlight,
+        subject_name=subject_name
     )
 
     if settings.AI_PROVIDER == "qwen":
@@ -115,7 +126,7 @@ def generate_share_content(report_data: Dict[str, Any], prompt_template: str, ap
     else:
         return call_gemini(prompt, api_key=key)
 
-def generate_variant_questions(seed_questions: list[Dict[str, Any]], count_per_seed: int = 1, api_key: str = None) -> list[Dict[str, Any]]:
+def generate_variant_questions(seed_questions: list[Dict[str, Any]], count_per_seed: int = 1, api_key: str = None, subject_name: str = "系统架构设计师") -> list[Dict[str, Any]]:
     """
     Generates variant questions based on seed questions.
     """
@@ -129,7 +140,7 @@ def generate_variant_questions(seed_questions: list[Dict[str, Any]], count_per_s
         seeds_text += f"ID: {q['id']}\n知识点: {q.get('knowledge_point', 'Unknown')}\nContent: {q['content']}\nOptions: {q['options']}\nAnswer: {q['answer']}\nExplanation: {q['explanation']}\n\n"
 
     prompt = f"""
-你是一位软考“系统架构设计师”（高级）的命题专家。
+你是一位软考“{subject_name}”（高级）的命题专家。
 请为以下每道种子题目生成 {count_per_seed} 道新的变体选择题。
 变体题目应测试相同的知识点，但使用不同的场景、数值或表述方式。
 确保难度和风格符合该专业考试的水平。

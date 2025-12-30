@@ -169,10 +169,17 @@ const Exam = () => {
         <div className="flex-1 flex flex-col min-w-0 min-h-[60vh] md:h-full md:overflow-hidden">
           {/* Header */}
           <div className="glass-card flex justify-between items-center mb-6 p-6 rounded-2xl">
-            <div>
-              <span className="text-sm font-semibold text-[#00838f] tracking-wider block mb-1">题目</span>
-              <div className="text-3xl font-extrabold text-[#00695c]">
-                {currentQIndex + 1} <span className="text-[#b2ebf2] text-xl font-normal">/ {sessionData.questions.length}</span>
+            <div className="flex flex-col">
+              {sessionData.subject_name && (
+                   <span className="text-xs font-bold text-white bg-[#00838f] px-2 py-0.5 rounded-full mb-2 self-start shadow-sm">
+                       {sessionData.subject_name}
+                   </span>
+              )}
+              <div>
+                  <span className="text-sm font-semibold text-[#00838f] tracking-wider block mb-1">题目</span>
+                  <div className="text-3xl font-extrabold text-[#00695c]">
+                    {currentQIndex + 1} <span className="text-[#b2ebf2] text-xl font-normal">/ {sessionData.questions.length}</span>
+                  </div>
               </div>
             </div>
             <div className="flex items-center space-x-2 text-[#00838f] bg-white/50 backdrop-blur px-4 py-2 rounded-xl border border-[#00838f]/20 font-mono text-xl font-bold shadow-sm">

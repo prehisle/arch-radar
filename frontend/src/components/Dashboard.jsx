@@ -8,7 +8,7 @@ import { getDashboardUsers, getDashboardStats, getMaterialStats } from '../api';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#a4de6c', '#d0ed57', '#ffc658'];
 
-const Dashboard = () => {
+const Dashboard = ({ subjectId }) => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
     users: [],
@@ -20,9 +20,9 @@ const Dashboard = () => {
     const fetchAllData = async () => {
       try {
         const [usersRes, statsRes, matRes] = await Promise.all([
-          getDashboardUsers(10),
+          getDashboardUsers(10, subjectId),
           getDashboardStats(),
-          getMaterialStats()
+          getMaterialStats(subjectId)
         ]);
 
         setData({
@@ -38,7 +38,7 @@ const Dashboard = () => {
     };
 
     fetchAllData();
-  }, []);
+  }, [subjectId]);
 
   if (loading) return <div className="p-8 text-center text-gray-500">加载数据中...</div>;
 

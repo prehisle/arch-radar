@@ -1,24 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { startExam } from '../api';
+import { startExam, getSubjects } from '../api';
 import LoadingOverlay from '../components/LoadingOverlay';
 import PageLayout from '../components/PageLayout';
+import { Helmet } from 'react-helmet-async';
 import { MessageCircle, X } from 'lucide-react';
+
+const FeatureCard = ({ icon, title, desc, delay, color, shadow, hoverColor }) => (
+  <div 
+    className="bg-white rounded-[20px] p-6 md:p-8 text-center shadow-[0_8px_30px_rgba(0,0,0,0.04)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-300 transform hover:-translate-y-2 group flex flex-col items-center h-full"
+    style={{ animationDelay: delay }}
+  >
+    <div 
+      className="w-[60px] h-[60px] md:w-[72px] md:h-[72px] rounded-[16px] md:rounded-[20px] flex items-center justify-center mb-4 md:mb-6 shadow-lg transition-transform duration-300 group-hover:scale-110"
+      style={{ background: color, boxShadow: `0 10px 20px ${shadow}` }}
+    >
+      {icon}
+    </div>
+    <h3 className="text-xl md:text-2xl font-bold text-gray-800 mb-2 md:mb-3 group-hover:text-[#00838f] transition-colors">{title}</h3>
+    <p className="text-sm md:text-base text-gray-600 leading-relaxed font-medium">{desc}</p>
+  </div>
+);
 
 const Home = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
+  const [subjects, setSubjects] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState(null);
+
+  useEffect(() => {
+    getSubjects().then(data => {
+        setSubjects(data);
+        // Default to first one or find "sys_arch"
+        if (data.length > 0) {
+            const defaultSub = data.find(s => s.code === 'sys_arch') || data[0];
+            setSelectedSubject(defaultSub);
+        }
+    }).catch(err => console.error("Failed to fetch subjects", err));
+  }, []);
 
   const handleStart = async () => {
+    if (!selectedSubject) return;
+
+    // Check for restricted subjects
+    const RESTRICTED_SUBJECTS = ['系统分析师', '系统规划与管理师', '网络规划设计师'];
+    if (RESTRICTED_SUBJECTS.includes(selectedSubject.name)) {
+        navigate('/coming-soon');
+        return;
+    }
+
     setLoading(true);
     try {
-      const data = await startExam();
+      const data = await startExam(selectedSubject.id);
       navigate(`/exam?sessionId=${data.session_id}`);
     } catch (e) {
       console.error(e);
-      // alert('Failed to start exam');
-      // Show more details if timeout
       if (e.code === 'ECONNABORTED' || e.message.includes('timeout')) {
           alert('AI 组卷超时，请检查网络或稍后重试。');
       } else {
@@ -31,14 +68,21 @@ const Home = () => {
 
   return (
     <PageLayout className="h-screen overflow-y-auto no-scrollbar">
-      <div className="relative flex flex-col items-center justify-center min-h-full pt-4 pb-32 text-center w-full max-w-[1200px] mx-auto overflow-hidden">
+      <Helmet>
+        <title>软考高级 AI 智能备考 - 系统架构/项目管理/系统分析/规划/网规</title>
+        <meta name="description" content="基于AI大模型的软考高级备考平台，支持系统架构设计师、信息系统项目管理师、系统分析师、系统规划与管理师、网络规划设计师等科目。提供软考真题在线测试、智能组卷、能力画像及2026软考备考建议。" />
+        <meta name="keywords" content="软考高级, 系统架构设计师, 信息系统项目管理师, 系统分析师, 系统规划与管理师, 网络规划设计师, 软考真题在线测试, 软考AI备考, 2026软考报名, 软考高级历年真题" />
+      </Helmet>
+      <div className="relative flex flex-col items-center justify-center min-h-full pt-6 pb-24 text-center w-full max-w-[1200px] mx-auto overflow-hidden">
         <LoadingOverlay visible={loading} message="正在智能组卷中..." />
         
-        <div className="mb-6 md:mb-10 animate-fadeInDown w-full">
-          <div className="inline-block bg-white/90 backdrop-blur-[10px] px-4 py-2 md:px-6 md:py-[10px] rounded-[24px] text-xs md:text-[14px] font-semibold text-[#00838f] border-2 border-[#00838f]/20 shadow-[0_4px_15px_rgba(0,131,143,0.15)] mb-4 tracking-[1px]">
-            系统架构设计师 · 软考高级
-          </div>
-          <h1 className="text-3xl md:text-[52px] font-extrabold mb-4 md:mb-6 tracking-[2px] text-gradient filter drop-shadow-[2px_2px_4px_rgba(0,0,0,0.1)] leading-tight">
+        <div className="mb-4 md:mb-8 animate-fadeInDown w-full">
+          {selectedSubject && (
+            <div className="inline-block bg-white/90 backdrop-blur-[10px] px-4 py-2 md:px-6 md:py-[10px] rounded-[24px] text-xs md:text-[14px] font-semibold text-[#00838f] border-2 border-[#00838f]/20 shadow-[0_4px_15px_rgba(0,131,143,0.15)] mb-4 tracking-[1px]">
+              {selectedSubject.name} · 软考高级
+            </div>
+          )}
+          <h1 className="text-3xl md:text-[48px] font-extrabold mb-4 md:mb-6 tracking-[2px] text-gradient filter drop-shadow-[2px_2px_4px_rgba(0,0,0,0.1)] leading-tight">
             AI 智能学习测评
           </h1>
           <p className="text-base md:text-[18px] text-[#00695c] font-medium tracking-[2px]">
@@ -46,7 +90,7 @@ const Home = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-[30px] w-full mb-6 md:mb-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-[30px] w-full mb-6 md:mb-8">
           <FeatureCard 
             icon={
               <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="w-[48px] h-[48px] fill-white">
@@ -93,6 +137,37 @@ const Home = () => {
             shadow="rgba(77, 208, 225, 0.3)"
             hoverColor="#4dd0e1"
           />
+        </div>
+
+        {/* Subject Selection */}
+        <div className="w-full max-w-4xl mb-6 animate-fadeInUp" style={{ animationDelay: '0.35s' }}>
+            <h2 className="text-xl md:text-2xl font-bold text-[#00695c] mb-4">选择您的考试科目</h2>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3">
+                {subjects.map(sub => (
+                    <div 
+                        key={sub.id}
+                        onClick={() => setSelectedSubject(sub)}
+                        className={`cursor-pointer p-2 md:p-3 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center gap-1 md:gap-2
+                            ${selectedSubject?.id === sub.id 
+                                ? 'border-[#00838f] bg-[#e0f7fa] shadow-md transform scale-105' 
+                                : 'border-gray-200 bg-white hover:border-[#4dd0e1] hover:shadow-sm'
+                            }
+                        `}
+                    >
+                        {/* Placeholder Icon */}
+                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-bold text-sm md:text-lg
+                            ${selectedSubject?.id === sub.id ? 'bg-[#00838f]' : 'bg-gray-300'}
+                        `}>
+                            {sub.name.substring(0, 1)}
+                        </div>
+                        <span className={`text-xs md:text-sm font-medium text-center
+                            ${selectedSubject?.id === sub.id ? 'text-[#00838f]' : 'text-gray-600'}
+                        `}>
+                            {sub.name}
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
 
         <div className="animate-fadeInUp" style={{ animationDelay: '0.4s', animationFillMode: 'both' }}>
@@ -159,30 +234,5 @@ const Home = () => {
     </PageLayout>
   );
 };
-
-const FeatureCard = ({ icon, title, desc, delay, color, shadow, hoverColor }) => (
-  <div 
-    className="glass-card p-[45px_35px] rounded-[24px] flex flex-col items-center text-center transition-all duration-700 ease-in-out group relative overflow-hidden animate-fadeInUp hover:-translate-y-[12px] hover:shadow-[0_20px_50px_rgba(0,172,193,0.25)] hover:border-[#00acc1]/30"
-    style={{ animationDelay: delay }}
-  >
-    {/* Top border gradient on hover */}
-    <div 
-        className="absolute top-0 left-0 right-0 h-[4px] origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-700 ease-in-out"
-        style={{ background: 'linear-gradient(90deg, #00acc1, #26c6da, #4dd0e1)' }}
-    ></div>
-
-    <div 
-      className="w-[90px] h-[90px] mb-[28px] rounded-[22px] flex items-center justify-center transition-transform duration-700 ease-in-out group-hover:scale-110 group-hover:[transform:scale(1.1)_rotateY(360deg)]"
-      style={{ 
-          background: color,
-          boxShadow: `0 10px 30px ${shadow}` 
-      }}
-    >
-      {icon}
-    </div>
-    <h3 className="text-[24px] font-bold text-[#00695c] mb-[20px]">{title}</h3>
-    <p className="text-[15px] leading-[1.9] text-[#546e7a]">{desc}</p>
-  </div>
-);
 
 export default Home;
