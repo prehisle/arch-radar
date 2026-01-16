@@ -98,29 +98,26 @@ export const downloadReportPDF = async (sessionId) => {
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
-    
-    // Try to extract filename from content-disposition header
-    const contentDisposition = response.headers['content-disposition'];
-    let fileName = `Smart_Assessment_Report_${sessionId.substring(0,8)}.pdf`;
-    if (contentDisposition) {
-        const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/);
-        if (fileNameMatch && fileNameMatch.length === 2)
-            fileName = fileNameMatch[1];
-    }
-    
-    link.setAttribute('download', fileName);
+    link.setAttribute('download', `report_${sessionId}.pdf`);
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-
-    // 2. Track Event
-    try {
-        await api.post('/api/exam/download-event', { session_id: sessionId });
-    } catch (e) {
-        console.warn("Failed to track download event", e);
-    }
+    link.remove();
 };
+
+export const downloadReportYAML = async (sessionId) => {
+    const response = await api.get(`/api/exam/report/${sessionId}/yaml`, {
+        responseType: 'blob',
+    });
+    
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `report_${sessionId}.yaml`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+};
+
 
 // --- Dashboard APIs ---
 

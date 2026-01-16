@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getReport, getShareContent, downloadReportPDF } from '../api';
+import { getReport, getShareContent, downloadReportPDF, downloadReportYAML } from '../api';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-import { Share2, ArrowLeft, Trophy, AlertTriangle, TrendingUp, X, Copy, Download, CheckCircle, XCircle, List, ChevronUp, MessageSquare } from 'lucide-react';
+import { Share2, ArrowLeft, Trophy, AlertTriangle, TrendingUp, X, Copy, Download, CheckCircle, XCircle, List, ChevronUp, MessageSquare, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
@@ -142,6 +142,15 @@ const Report = () => {
     }
   };
 
+  const handleExportYAML = async () => {
+    try {
+        await downloadReportYAML(sessionId);
+    } catch (e) {
+        console.error("Failed to download YAML:", e);
+        alert("YAML导出失败，请稍后重试");
+    }
+  };
+
   if (!data) return <div className="p-8 text-center text-[#00838f] font-medium">生成报告中...</div>;
 
   const { ai_report: report, questions } = data;
@@ -271,7 +280,7 @@ const Report = () => {
             <div className="glass-card p-6 rounded-2xl">
                <h3 className="text-xl font-bold text-[#00695c] mb-4 border-b border-[#b2ebf2] pb-2">个性化学习建议</h3>
                <ul className="space-y-4">
-                 {report.learning_path.map((step, idx) => (
+                 {(report.learning_path || []).map((step, idx) => (
                    <li key={idx} className="flex items-start group">
                      <span className="flex-shrink-0 w-8 h-8 rounded-full bg-[#e0f7fa] text-[#00838f] border border-[#b2ebf2] flex items-center justify-center text-sm font-bold mt-0.5 mr-4 group-hover:bg-[#00acc1] group-hover:text-white transition-colors">
                        {idx + 1}
@@ -345,6 +354,12 @@ const Report = () => {
             <Download className="w-5 h-5 mr-2" /> 导出 PDF
           </button>
           <button 
+            onClick={handleExportYAML}
+            className="px-8 py-4 rounded-xl bg-white border border-[#00acc1] text-[#00838f] font-bold shadow-sm hover:bg-[#e0f7fa] transition-all flex items-center justify-center"
+          >
+            <FileText className="w-5 h-5 mr-2" /> 导出 YAML
+          </button>
+          <button 
             onClick={handleShareClick}
             className="px-8 py-4 rounded-xl bg-gradient-to-r from-[#00acc1] to-[#0097a7] text-white font-bold shadow-[0_8px_20px_rgba(0,172,193,0.3)] hover:shadow-[0_12px_25px_rgba(0,172,193,0.4)] hover:-translate-y-1 transition-all flex items-center justify-center"
           >
@@ -367,9 +382,10 @@ const Report = () => {
               </div>
               <div className="divide-y divide-[#b2ebf2]">
                   {questions.map((q, idx) => {
+                      if (!q) return null; // Safety check
                       const isCorrect = q.user_answer === q.answer;
                       return (
-                          <div key={q.id} id={`question-${idx}`} className={clsx("hover:bg-white/40 transition-colors", isMobile ? "p-4" : "p-8")}>
+                          <div key={q.id || idx} id={`question-${idx}`} className={clsx("hover:bg-white/40 transition-colors", isMobile ? "p-4" : "p-8")}>
                               <div className="flex items-start mb-4">
                                   <span className={clsx(
                                       "flex-shrink-0 rounded-full flex items-center justify-center text-white font-bold shadow-sm",
@@ -384,12 +400,12 @@ const Report = () => {
                                               remarkPlugins={[remarkGfm, remarkMath]} 
                                               rehypePlugins={[rehypeKatex, rehypeRaw]}
                                           >
-                                              {processContent(q.content)}
+                                              {processContent(q.content || "")}
                                           </ReactMarkdown>
                                       </div>
                                       
                                       <div className="space-y-3 mb-8">
-                                          {q.options && Array.isArray(q.options[0]) ? (
+                                          {q.options && Array.isArray(q.options) && Array.isArray(q.options[0]) ? (
                                               // Multi-blank display
                                               q.options.map((optionGroup, groupIdx) => {
                                                   const userAnsArr = (q.user_answer || "").split(',');
@@ -402,6 +418,7 @@ const Report = () => {
                                                           <h5 className="font-bold text-[#00838f] mb-2 text-sm">第 {groupIdx + 1} 空</h5>
                                                           <div className="space-y-2">
                                                               {optionGroup.map((opt, i) => {
+                                                                  if (!opt) return null;
                                                                   const optKey = opt.split('.')[0];
                                                                   const optText = opt.substring(opt.indexOf('.') + 1).trim();
                                                                   
@@ -437,6 +454,7 @@ const Report = () => {
                                           ) : (
                                               // Single Choice
                                               (q.options || []).map((opt, i) => {
+                                                  if (!opt) return null;
                                                   const optKey = opt.split('.')[0];
                                                   const optText = opt.substring(opt.indexOf('.') + 1).trim();
                                                   const isUserSelected = q.user_answer === optKey;

@@ -47,6 +47,31 @@ def health_check():
     """健康检查端点，用于容器健康检查"""
     return {"status": "healthy", "service": "arch-radar-backend"}
 
+@app.get("/api/exam/report/{session_id}/yaml")
+def download_report_yaml(session_id: str, db: Session = Depends(get_session)):
+    session = db.exec(select(ExamSession).where(ExamSession.id == session_id)).first()
+    if not session or not session.ai_report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    
+    import yaml
+    from fastapi.responses import Response
+    
+    # Filter out share_content
+    report_data = session.ai_report.copy()
+    if 'share_content' in report_data:
+        del report_data['share_content']
+
+    # Dump JSON to YAML
+    yaml_content = yaml.dump(report_data, allow_unicode=True, sort_keys=False)
+    
+    return Response(
+        content=yaml_content,
+        media_type="application/x-yaml",
+        headers={
+            "Content-Disposition": f"attachment; filename=report_{session_id}.yaml"
+        }
+    )
+
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()

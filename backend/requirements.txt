@@ -13,3 +13,4 @@ python-dotenv
 redis
 requests
 captcha
+PyYAML
