@@ -179,6 +179,7 @@ const Report = () => {
             )}
             <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#00838f] to-[#00acc1] mb-2">测评完成！</h1>
             <p className="text-[#546e7a] text-lg">您的当前评级：<span className="font-bold text-[#00838f] text-xl">{title}</span></p>
+            <p className="text-[#90a4ae] text-xs mt-1">本服务为AI生成内容，结果仅供参考</p>
           </div>
           
           <div className="flex items-center justify-center w-full md:w-auto space-x-3 md:space-x-8 z-10 mt-6 md:mt-0">
