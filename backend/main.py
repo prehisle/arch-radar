@@ -243,6 +243,7 @@ async def upload_weights(
     data = parse_weight_table(content)
     
     count = 0
+    updated_count = 0
     for item in data:
         # Determine names based on mode
         if 'sub_chapter' in item:
@@ -251,69 +252,85 @@ async def upload_weights(
             chap = item.get('chapter', '').strip()
             name = item.get('name', '').strip()
             
-            # Merged Name: Chapter-SubChapter-Name
-            # Remove all spaces from the components before merging (as requested)
-            # Example: "1. 信息化 发展" -> "1.信息化发展"
-            # User requirement: "去掉中间的空格".
-            # Use regex to remove ALL whitespace characters (including \xa0, \t, etc.)
-            import re
+            # Use original name for matching, DO NOT merge
+            kp_name = name
+            # kp_chapter_display = chap # Keep original chapter string
             
-            sub_chap_clean = re.sub(r'\s+', '', sub_chap)
-            chap_clean = re.sub(r'\s+', '', chap)
-            name_clean = re.sub(r'\s+', '', name)
-            
-            kp_name = f"{chap_clean}-{sub_chap_clean}-{name_clean}"
-            # Display Chapter: Chapter-SubChapter
-            kp_chapter_display = f"{chap_clean}-{sub_chap_clean}"
-            
-            # Update item for DB creation
-            item['name'] = kp_name
-            item['chapter'] = kp_chapter_display
+            # item['name'] = kp_name
+            # item['chapter'] = chap
         else:
             # Standard mode
             kp_name = item['name']
-            # kp_chapter_display = item['chapter'] (already in item)
+            chap = item.get('chapter', '').strip()
 
         # Check if KP exists in this subject
-        query = select(KnowledgePoint).join(MajorChapter).where(
-            KnowledgePoint.name == kp_name,
-            MajorChapter.subject_id == subject_id
-        )
-        kp = db.exec(query).first()
+        # Match by Name AND (optionally) Chapter to be more precise if names are duplicated across chapters?
+        # For now, match by Name + Subject (via MajorChapter)
         
-        # Determine Major Chapter ID (needed for update or create)
+        # Try to find the MajorChapter first to scope the search
         mc_id = None
-        if item.get('chapter'):
+        if chap:
             import re
-            # Match "1. xxx" or "1 xxx" at start of the chapter string (which might be "1. Info - 1.1 Sub")
-            match = re.match(r'^(\d+)', item['chapter'].strip())
+            match = re.match(r'^(\d+)', chap.strip())
             if match:
                 order = int(match.group(1))
                 mc = db.exec(select(MajorChapter).where(
                     MajorChapter.subject_id == subject_id,
                     MajorChapter.order == order
                 )).first()
-                if mc: mc_id = mc.id
+                if mc: 
+                    mc_id = mc.id
 
+        # Query KP
+        query = select(KnowledgePoint).where(KnowledgePoint.name == kp_name)
+        if mc_id:
+            query = query.where(KnowledgePoint.major_chapter_id == mc_id)
+        else:
+            # Fallback: if no MC found (maybe chapter string format diff), try join
+            query = query.join(MajorChapter).where(MajorChapter.subject_id == subject_id)
+            
+        kp = db.exec(query).first()
+        
         if kp:
             # Update weight
             kp.weight_level = item['weight_level']
             kp.weight_score = item['weight_score']
             kp.frequency = item.get('frequency', 0)
-            kp.analysis = item.get('analysis')
-            # Also update MajorChapter if missing or different (though usually fixed by order)
-            if mc_id and kp.major_chapter_id != mc_id:
-                kp.major_chapter_id = mc_id
+            if item.get('analysis'):
+                kp.analysis = item.get('analysis')
+            
+            # Update chapter string if provided and different?
+            # if chap: kp.chapter = chap
+            
             db.add(kp)
+            updated_count += 1
         else:
-            # Create new
-            kp = KnowledgePoint(**item)
-            kp.major_chapter_id = mc_id
-            db.add(kp)
-        count += 1
+            # If not found, create new? Or skip?
+            # User said "update weights", implies existing KPs. 
+            # But usually we want to import if missing.
+            # Let's create if missing, using the info we have.
+            
+            # If sub_chapter exists, maybe append to chapter string for storage?
+            # Or just store as is.
+            
+            final_chapter_str = chap
+            if 'sub_chapter' in locals() and sub_chap:
+                 final_chapter_str = f"{chap} {sub_chap}"
+            
+            new_kp = KnowledgePoint(
+                name=kp_name,
+                chapter=final_chapter_str,
+                weight_level=item['weight_level'],
+                weight_score=item['weight_score'],
+                frequency=item.get('frequency', 0),
+                analysis=item.get('analysis'),
+                major_chapter_id=mc_id
+            )
+            db.add(new_kp)
+            count += 1
     
     db.commit()
-    return {"message": f"Updated/Created {count} knowledge points from weights for Subject {subject_id}"}
+    return {"message": f"Processed knowledge points for Subject {subject_id}: Updated {updated_count}, Created {count}"}
 
 @app.post("/api/admin/upload/questions")
 async def upload_questions(

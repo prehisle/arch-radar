@@ -43,7 +43,7 @@ class Subject(SQLModel, table=True):
 
 class MajorChapter(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True) # Removed unique=True
+    name: str = Field(index=True)
     order: int = Field(default=0)
     subject_id: Optional[int] = Field(default=None, foreign_key="subject.id")
 

@@ -55,28 +55,38 @@ def parse_weight_table(content: str) -> List[Dict[str, Any]]:
             
         parts = [p.strip() for p in line.strip().split('|')]
         
-        if len(parts) < 9:
-            continue
-            
+        # parts[0] is empty (before first |), parts[1] is 序号
+        # Clean parts list
+        parts = [p.strip() for p in parts if p.strip()]
+        
+        # Standard: 序号 | 章节 | 知识点 | 子知识点 | 出现频次 | 权重等级 | 数字化权重 | 考情精简分析
+        # Extended: 序号 | 章节 | 子章节 | 知识点 | 子知识点 | 出现频次 | 权重等级 | 数字化权重 | 考情精简分析
+        
         try:
             item = {}
             if has_sub_chapter:
                 # Extended Mapping
-                # parts[2] = Chapter
-                # parts[3] = SubChapter
-                # parts[4] = Name (KnowledgePoint)
+                # 0: 序号
+                # 1: 章节
+                # 2: 子章节
+                # 3: 知识点
+                # 4: 子知识点
+                # 5: 出现频次
+                # 6: 权重等级
+                # 7: 数字化权重
+                # 8: 考情精简分析
                 
-                item["chapter"] = clean_markdown(parts[2])
-                item["sub_chapter"] = clean_markdown(parts[3])
-                item["name"] = clean_markdown(parts[4])
+                if len(parts) < 8: continue
+
+                item["chapter"] = clean_markdown(parts[1])
+                item["sub_chapter"] = clean_markdown(parts[2])
+                item["name"] = clean_markdown(parts[3])
+                # sub_knowledge_point = parts[4] (ignored for now?)
                 
-                # Freq/Level/Score indices depend on fixed columns.
-                kp_idx = 4
-                
-                freq_idx = kp_idx + 2
-                level_idx = kp_idx + 3
-                score_idx = kp_idx + 4
-                analysis_idx = kp_idx + 5
+                freq_idx = 5
+                level_idx = 6
+                score_idx = 7
+                analysis_idx = 8
                 
                 if len(parts) > freq_idx and parts[freq_idx].isdigit():
                      item["frequency"] = int(parts[freq_idx])
@@ -94,14 +104,25 @@ def parse_weight_table(content: str) -> List[Dict[str, Any]]:
                 
             else:
                 # Standard Mapping (SysArch)
-                item["chapter"] = clean_markdown(parts[2])
-                item["name"] = clean_markdown(parts[3])
+                # 0: 序号
+                # 1: 章节
+                # 2: 知识点
+                # 3: 子知识点
+                # 4: 出现频次
+                # 5: 权重等级
+                # 6: 数字化权重
+                # 7: 考情精简分析
                 
-                item["frequency"] = int(parts[5]) if parts[5].isdigit() else 0
-                item["weight_level"] = clean_markdown(parts[6])
-                item["weight_score"] = int(parts[7]) if parts[7].isdigit() else 0
-                item["analysis"] = clean_markdown(parts[8]) if len(parts) > 8 else ""
+                if len(parts) < 7: continue
 
+                item["chapter"] = clean_markdown(parts[1])
+                item["name"] = clean_markdown(parts[2])
+                
+                item["frequency"] = int(parts[4]) if parts[4].isdigit() else 0
+                item["weight_level"] = clean_markdown(parts[5]) if len(parts) > 5 else "一般"
+                item["weight_score"] = int(parts[6]) if len(parts) > 6 and parts[6].isdigit() else 0
+                item["analysis"] = clean_markdown(parts[7]) if len(parts) > 7 else ""
+            
             data.append(item)
         except (ValueError, IndexError) as e:
             print(f"Error parsing chunk: {e}")
@@ -205,69 +226,81 @@ def parse_questions(content: str, source_type: str) -> List[Dict[str, Any]]:
                      explanation = re.split(r'\n\s*---\s*', explanation)[0].strip()
                      body = body.replace(expl_full_str, "")
 
-                # 4. Clean Body
+                # 4. Clean Body and Handle Options
                 body_part = body.strip()
 
                 # Check for Pattern 2 (Bracket headers like **(1)** or (1))
-                # We look for explicit sub-question blocks
-                sub_q_pattern = r'(\*\*\((\d+)\)\*\*|\((\d+)\))\s*\n'
-                if re.search(sub_q_pattern, body_part) or re.search(sub_q_pattern, chunk):
-                     # This is a complex multi-part question where answers might be interleaved
-                     # Strategy: Find all indices of sub-questions
-                     sub_matches = list(re.finditer(r'(?:^|\n)(?:\*\*\((\d+)\)\*\*|\((\d+)\))', chunk))
-                     
-                     if sub_matches:
-                         answers_map = {}
-                         
-                         # Get general content (before first sub-question)
-                         q_content = chunk[:sub_matches[0].start()].strip()
-                         # Clean KP line if in q_content
-                         if kp_match:
-                             q_content = q_content.replace(kp_match.group(0), "", 1).strip()
-                         
-                         for i, match in enumerate(sub_matches):
-                             idx_str = match.group(1) or match.group(2)
-                             idx = int(idx_str)
-                             
-                             start = match.end()
-                             end = sub_matches[i+1].start() if i + 1 < len(sub_matches) else len(chunk)
-                             
-                             sub_block = chunk[start:end]
-                             
-                             # Extract answer from sub_block
-                             sub_ans = ""
-                             sub_ans_match = re.search(r'(\*\*答案\*\*[:：]\s*([A-D](?:[,，\s]*[A-D])*))', sub_block)
-                             if sub_ans_match:
-                                 raw_ans = sub_ans_match.group(2)
-                                 sub_ans = re.sub(r'[,，\s]+', ',', raw_ans)
-                                 # Remove answer line from sub_block
-                                 sub_block = sub_block.replace(sub_ans_match.group(1), "")
-                             
-                             # Clean up sub_block (remove newlines etc)
-                             sub_block = sub_block.strip()
-                             
-                             # Append to options/content
-                             q_content += f"\n({idx}) {sub_block}"
-                             
-                             if sub_ans:
-                                 answers_map[idx] = sub_ans
-                         
-                         # Construct final answer string "1:A, 2:B"
-                         sorted_idxs = sorted(answers_map.keys())
-                         answer = ", ".join([f"{k}:{answers_map[k]}" for k in sorted_idxs])
-                         
-                         questions.append({"content": q_content, "answer": answer, "explanation": explanation, "kp_raw": kp_raw, "source_type": source_type})
-                         continue # Done with this chunk
+                # This indicates a multi-blank question with separate option groups
+                # Pattern: 
+                # **(1)** 
+                # A. ...
+                # B. ...
+                # 
+                # **(2)**
+                # A. ...
                 
-                # Check validity of body_part for standard case
-                # If body_part is just the header like "# 综合知识...", it won't have an answer.
-                # In past_paper mode, a valid question MUST have an answer.
-                if not answer:
-                    continue
+                sub_q_pattern = r'(?:^|\n)\s*(\*\*[\(（]\d+[\)）]\*\*|[\(（]\d+[\)）])'
+                if re.search(sub_q_pattern, body_part):
+                     # This is a multi-part question
+                     # Strategy:
+                     # 1. Split body into Main Question Text and Sub-Question Blocks
+                     # 2. Parse each block for options
+                     
+                     # Find the first occurrence of (1) or **(1)**
+                     first_sub_match = re.search(sub_q_pattern, body_part)
+                     
+                     q_content_main = body_part[:first_sub_match.start()].strip()
+                     remaining_body = body_part[first_sub_match.start():]
+                     
+                     # Split remaining body by (N) pattern
+                     # Use capturing group to keep the delimiters
+                     # re.split behavior with capturing group: [text_before, delimiter, text_after, delimiter, ...]
+                     # But delimiter itself is part of the split.
+                     
+                     # Better: find all starts
+                     sub_matches = list(re.finditer(sub_q_pattern, body_part))
+                     
+                     all_options = []
+                     
+                     for i, match in enumerate(sub_matches):
+                         start = match.end()
+                         end = sub_matches[i+1].start() if i + 1 < len(sub_matches) else len(body_part)
+                         
+                         sub_block = body_part[start:end].strip()
+                         
+                         # Parse options in this block
+                         # Look for "A. ", "B. " etc.
+                         current_sub_options = []
+                         # Allow A. B. C. D. on same line or different lines
+                         # Normalize newlines for easier regex
+                         sub_block_norm = re.sub(r'\s+([A-D]\.)', r'\n\1', sub_block)
+                         
+                         opt_matches = re.findall(r'(?:^|\n)\s*([A-D])\.\s*(.*?)(?=\n\s*[A-D]\.|$)', sub_block_norm, re.DOTALL)
+                         
+                         for label, text in opt_matches:
+                             current_sub_options.append(f"{label}. {text.strip()}")
+                         
+                         if current_sub_options:
+                             all_options.append(current_sub_options)
+                         else:
+                             # Fallback: if no options found, maybe it's just text?
+                             # Or maybe options are formatted differently?
+                             # Just append empty list to keep index alignment
+                             all_options.append([])
 
-                # Standard case
+                     questions.append({
+                        "content": q_content_main, 
+                        "options": all_options, # List of Lists
+                        "answer": answer, # "D、B、C" or "D,B,C" -> Normalize to "D,B,C"
+                        "explanation": explanation, 
+                        "kp_raw": kp_raw, 
+                        "source_type": source_type
+                     })
+                     continue
+
+                # Standard case (Single Choice)
                 # Extract Options from body_part if present
-                # Find first "A." at start of line
+                # Find first "A." at start of line or after newline
                 opt_start_match = re.search(r'(?:^|\n)\s*A\.', body_part)
                 
                 if opt_start_match:
@@ -275,8 +308,11 @@ def parse_questions(content: str, source_type: str) -> List[Dict[str, Any]]:
                     opts_text = body_part[opt_start_match.start():]
                     
                     current_options = []
-                    # Regex looks for "X. " at start of line (or string)
-                    opt_matches = re.findall(r'(?:^|\n)\s*([A-Z])\.\s+(.*?)(?=\n\s*[A-Z]\.|$)', opts_text, re.DOTALL)
+                    # Normalize: ensure A. B. C. D. start on new lines if they are compacted
+                    opts_text_norm = re.sub(r'\s+([B-D]\.)', r'\n\1', opts_text)
+                    
+                    # Regex looks for "X. " at start of line
+                    opt_matches = re.findall(r'(?:^|\n)\s*([A-Z])\.\s*(.*?)(?=\n\s*[A-Z]\.|$)', opts_text_norm, re.DOTALL)
                     
                     for label, text in opt_matches:
                         current_options.append(f"{label}. {text.strip()}")

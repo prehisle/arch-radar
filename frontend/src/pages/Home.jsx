@@ -44,7 +44,7 @@ const Home = () => {
     if (!selectedSubject) return;
 
     // Check for restricted subjects
-    const RESTRICTED_SUBJECTS = ['系统分析师', '系统规划与管理师', '网络规划设计师'];
+    const RESTRICTED_SUBJECTS = ['系统规划与管理师', '网络规划设计师'];
     if (RESTRICTED_SUBJECTS.includes(selectedSubject.name)) {
         navigate('/coming-soon');
         return;
